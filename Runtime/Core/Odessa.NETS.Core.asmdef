@@ -1,0 +1,21 @@
+{
+    "name": "Odessa.NETS.Core.asmdef",
+    "references": [
+        "GUID:c55d28459d9c4444ebb4788be912e1f1",
+        "GUID:3082c70fcbbd4eb43bd7ca841aeacc41"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Odessa.Core.dll",
+        "websocket-sharp.dll",
+        "EntityTracking.dll",
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

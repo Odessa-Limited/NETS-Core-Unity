@@ -15,15 +15,16 @@ using Newtonsoft.Json.UnityConverters.AI.NavMesh;
 using Newtonsoft.Json.UnityConverters.Geometry;
 using Newtonsoft.Json.UnityConverters.Hashing;
 using Newtonsoft.Json.UnityConverters.Physics;
-using Newtonsoft.Json.UnityConverters.Physics2D;
 using Newtonsoft.Json.UnityConverters.Scripting;
+using Newtonsoft.Json.UnityConverters.Physics2D;
+using WebSocketSharp;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
-using System.IO;
 #endif
 
-namespace Odessa.NETS {
+namespace OdessaEngine.NETS.Core {
     [ExecuteInEditMode]
     public class NetsNetworking : MonoBehaviour {
 

@@ -1,27 +1,29 @@
 {
-    "name": "com.Odessa.NETS.Core",
-    "displayName": "Odessa NETS Core",
-    "version": "0.0.1",
-    "unity": "2019.3",
-    "description": "Odessa NETS Core is a multiplayer package for unity Networking. This being the Core version is the default base package needed for using NETS.",
-    "keywords": [
-          "multiplayer",
-          "networking",
-          "unity",
-          "tools"
-      ],
-    "homepage": "https://odessaengine.com/",
-    "bugs": {
-      "url": "https://github.com/Odessa-Limited/NETS-Core-Unity/issues"
-     },
-    "repository": {
-       "type": "git",
-       "url": "ssh://git@github.com:Odessa-Limited/NETS-Core-Unity.git"
-    },
-    "license": "MIT",
-    "author": {
-           "name": "Odessa limited",
-           "email": "support@odessaengine.com",
-           "url": "https://odessaengine.com/"
-     }
-  }
+  "name": "com.odessa.nets.core",
+  "displayName": "Odessa NETS Core",
+  "version": "0.0.2",
+  "unity": "2018.1",
+  "description": "Odessa NETS Core is a multiplayer package for unity Networking. This being the Core version is the default base package needed for using NETS.",
+  "keywords": [
+    "multiplayer",
+    "networking",
+    "unity",
+    "tools"
+  ],
+  "homepage": "https://odessaengine.com/",
+  "bugs": {
+    "url": "https://github.com/Odessa-Limited/NETS-Core-Unity/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Odessa-Limited/NETS-Core-Unity.git"
+  },
+  "license": "GNU GPL",
+  "author": {
+    "name": "Odessa Limited",
+    "email": "support@odessaengine.com",
+    "url": "https://odessaengine.com"
+  },
+  "category": "Utility",
+  "type": "library"
+}
