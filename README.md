@@ -2,20 +2,27 @@
 
 ## Using NETS in unity
 ```
-{
-"scopedRegistries": [
+{  
+    "scopedRegistries": [
     {
       "name": "Odessa NETS",
       "url": "https://npm.cloudsmith.io/odessa/NETS",
       "scopes": [
         "com.odessa.nets"
       ]
+    },
+    {
+      "name": "Packages from jillejr",
+      "url": "https://npm.cloudsmith.io/jillejr/newtonsoft-json-for-unity/",
+      "scopes": [
+        "jillejr"
+      ]
     }
   ],
   "dependencies": {
+    "jillejr.newtonsoft.json-for-unity": "12.0.301",
+    "jillejr.newtonsoft.json-for-unity.converters": "1.0.0",
     "com.odessa.nets.core": "0.0.2",
-    "jillejr.newtonsoft.json-for-unity": "git+https://github.com/jilleJr/Newtonsoft.Json-for-Unity.git#12.0.301",
-    "jillejr.newtonsoft.json-for-unity.converters": "git+https://github.com/jilleJr/Newtonsoft.Json-for-Unity.Converters.git#1.0.0",
     ...
     }
 }
