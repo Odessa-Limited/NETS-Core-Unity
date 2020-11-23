@@ -29,7 +29,7 @@ namespace OdessaEngine.NETS.Core {
     public class NetsNetworking : MonoBehaviour {
 
         int RoomServicePort = 8001;
-        string URL = "140.82.41.234";
+        string URL = "roomservice.nets.odessaengine.com";
         public string applicationGuid = "0123456789abcdef0123456789abcdef";
         public bool UseLocal = false;
         public string DefaultRoomName = "default2";
@@ -212,7 +212,7 @@ namespace OdessaEngine.NETS.Core {
                 }));
                 yield break;
             }
-            CreateOrJoinRoom("roomservice.nets.odessaengine.com", DefaultRoomName);
+            CreateOrJoinRoom(URL, DefaultRoomName);
             ips.Reverse();
         }
 
