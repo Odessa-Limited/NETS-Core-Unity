@@ -201,7 +201,8 @@ namespace OdessaEngine.NETS.Core {
             //ips.Add("ws://127.0.0.1:" + port);
             //ips.Add("wss://" + URL + ":" + (port + 1000));
             if (hitWorkerDirectly) {
-                StartCoroutine(connect($"ws://{DebugWorkerUrlAndPort}"));
+
+                StartCoroutine(connect($"{(DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{DebugWorkerUrlAndPort}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
                         bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
@@ -536,7 +537,7 @@ namespace OdessaEngine.NETS.Core {
                     Debug.LogError("NETS Error on server contact devs");
                     return;
                 }
-                StartCoroutine(connect($"ws://{roomState.ip}"));
+                StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
                         bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
