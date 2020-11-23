@@ -2,7 +2,6 @@
 using System.IO;
 using UnityEngine;
 
-
 namespace OdessaEngine.NETS.Core {
     class NetsInitialization {
         [UnityEditor.Callbacks.DidReloadScripts]

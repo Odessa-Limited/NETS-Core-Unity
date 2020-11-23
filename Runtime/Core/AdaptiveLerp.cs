@@ -1,6 +1,13 @@
 ﻿using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
+	public enum LerpType {
+		None,
+		Velocity,
+		Smooth,
+		Linear,
+	}
+
 	public abstract class AdaptiveLerp<T> {
 		T previousValue = default;
 		T currentValue = default;
@@ -12,12 +19,6 @@ namespace OdessaEngine.NETS.Core {
 		public float velocityCorrectionAmount = 0.1f;
 		public float timeTolerance = 0.7f;
 		public LerpType type = LerpType.Velocity;
-
-		public enum LerpType {
-			Velocity,
-			Smooth,
-			Linear,
-		}
 
 		T lastReturnedValue = default;
 		public float estimatedVelocityChangeBeforeTeleportSeconds = 3;

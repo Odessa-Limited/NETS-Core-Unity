@@ -1,0 +1,17 @@
+{
+    "name": "NetsEditor",
+    "references": [
+        "GUID:5b4a93b305dc65f4696520d62459bd5b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
