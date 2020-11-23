@@ -15,13 +15,13 @@ using Newtonsoft.Json.UnityConverters.AI.NavMesh;
 using Newtonsoft.Json.UnityConverters.Geometry;
 using Newtonsoft.Json.UnityConverters.Hashing;
 using Newtonsoft.Json.UnityConverters.Physics;
-using Newtonsoft.Json.UnityConverters.Scripting;
 using Newtonsoft.Json.UnityConverters.Physics2D;
-using WebSocketSharp;
-
+using Newtonsoft.Json.UnityConverters.Scripting;
+using static OdessaEngine.NETS.Core.NetsEntity;
 
 #if UNITY_EDITOR
 using UnityEditor;
+using System.IO;
 #endif
 
 namespace OdessaEngine.NETS.Core {
@@ -108,7 +108,7 @@ namespace OdessaEngine.NETS.Core {
         public bool CreateFromGameObject(NetsEntity entity) {
             if (!canSend) return false;
             if (currentRoom.HasValue == false) return false;
-            entity.localModel.Owner = entity.ServerControlled ? new Guid() : (myAccountGuid ?? Guid.NewGuid());
+            entity.localModel.Owner = entity.Authority.IsServerOwned() ? new Guid() : (myAccountGuid ?? Guid.NewGuid());
 
             entity.roomGuid = currentRoom.Value;
             if (string.IsNullOrEmpty(entity.localModel.PrefabName)) 
@@ -268,7 +268,7 @@ namespace OdessaEngine.NETS.Core {
 
                         var newGo = Instantiate(typeToCreate.prefab);
                         var component = newGo.GetComponent<NetsEntity>();
-                        if (component.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
+                        if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
                         entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
                         component.OnCreatedOnServer(roomGuid, entity);
                     } catch (Exception e) {
@@ -299,10 +299,15 @@ namespace OdessaEngine.NETS.Core {
                                 if (recievedFirstPacket == false) {
                                     if (IsServer == false) {
                                         var localServerEntities = FindObjectsOfType<NetsEntity>()
-                                            .Where(e => e.ServerControlled)
+                                            .Where(e => e.Authority.IsServerOwned())
                                             .ToList();
                                         print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
-                                        localServerEntities.ForEach(e => Destroy(e.gameObject));
+                                        localServerEntities.ForEach(e => {
+                                            var comp = e.GetComponent<NetsEntity>();
+                                            KnownServerSingletons.Remove(comp.prefab);
+                                            Destroy(e.gameObject);
+
+                                        });
                                     }
                                     recievedFirstPacket = true;
                                 }
@@ -506,7 +511,7 @@ namespace OdessaEngine.NETS.Core {
                     name = asGo.name,
                     prefab = asGo,
                 });
-                if (networkedComponent.ServerSingleton) {
+                if (networkedComponent.Authority == AuthorityEnum.ServerSingleton) {
                     ServerSingletonsList.Add(new NetworkObjectConfig {
                         name = asGo.name,
                         prefab = asGo,

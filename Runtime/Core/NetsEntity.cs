@@ -5,48 +5,41 @@ using Odessa.Nets.EntityTracking;
 using System.Linq;
 using System;
 using System.Reflection;
-using System.Linq.Expressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
+
 namespace OdessaEngine.NETS.Core {
     [ExecuteInEditMode]
     public class NetsEntity : MonoBehaviour {
+        public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
+        public Transform addedTransform;
+
         [Header("Sync properties")]
         [Range(0.0f, 20.0f)]
         public float SyncFramesPerSecond = 1f;
-        [Header("Fields To Sync")]
-        public bool SyncPosition = true;
-        public bool SyncRotation = true;
-        public bool SyncScale = true;
-        public bool SyncAnimation = true;
-        public TransformReplicationOverrides SyncTransformOverrides = new TransformReplicationOverrides();
 
-        public bool ServerControlled = false;
-        public bool ServerSingleton = false;
+        public enum AuthorityEnum {
+            Client,
+            Server,
+            ServerSingleton,
+        }
+        public AuthorityEnum Authority;
 
         public ulong Id;
         public Guid roomGuid;
         public Guid? creationGuid;
         NetsEntityState state;
 
-        Vector3AdaptiveLerp positionLerp = new Vector3AdaptiveLerp();
-        Vector3AdaptiveLerp rotationLerp = new Vector3AdaptiveLerp();
-        Vector3AdaptiveLerp scaleLerp = new Vector3AdaptiveLerp();
-        [Serializable]
-        public struct TransformReplicationOverrides {
-            public Transform position;
-            public Transform rotation;
-            public Transform scale;
-            public Transform animation;
-        }
-        Transform GetPositionTransform() => SyncTransformOverrides.position != null ? SyncTransformOverrides.position : transform; // Using ?? does not work
-        Transform GetRotationTransform() => SyncTransformOverrides.rotation != null ? SyncTransformOverrides.rotation : transform; // Using ?? does not work
-        Transform GetScaleTransform() => SyncTransformOverrides.scale != null ? SyncTransformOverrides.scale : transform; // Using ?? does not work
-        Transform GetAnimationTransform() => SyncTransformOverrides.animation != null ? SyncTransformOverrides.animation : transform; // Using ?? does not work
+        private static PropertyInfo[] GetValidPropertiesFor(Type t) => t
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(p => !p.GetGetMethod().IsStatic)
+            .Where(p => t != typeof(Transform) || new string[] { "localPosition", "localEulerAngles", "localScale" }.Contains(p.Name))
+            .Where(p => t != typeof(Rigidbody2D) || new string[] { "velocity", "angularVelocity", "mass", "linearDrag", "angularDrag" }.Contains(p.Name))
+            .ToArray();
 
         public enum NetsEntityState {
             Uninitialized,
@@ -64,16 +57,16 @@ namespace OdessaEngine.NETS.Core {
         public string prefab;
 
         private void Awake() {
-            positionLerp.expectedReceiveDelay = 1f / SyncFramesPerSecond;
-            rotationLerp.expectedReceiveDelay = 1f / SyncFramesPerSecond;
-            scaleLerp.expectedReceiveDelay = 1f / SyncFramesPerSecond;
+#if UNITY_EDITOR
+            if (Application.isPlaying == false) return;
+#endif
 
             localModel = new KeyPairEntity {
                 PrefabName = prefab,
                 isNew = true,
             };
 
-            if (ServerSingleton) NetsNetworking.KnownServerSingletons.Add(prefab, this);
+            if (Authority == AuthorityEnum.ServerSingleton) NetsNetworking.KnownServerSingletons.Add(prefab, this);
         }
 
         private void TryCreateOnServer() {
@@ -101,7 +94,7 @@ namespace OdessaEngine.NETS.Core {
             if (shouldSetFields)
                 e.Fields.ToList().ForEach(kv => OnFieldChange(e, kv.Key, true));
             else {
-                if (OwnedByMe == false && ServerControlled == false) {
+                if (OwnedByMe == false && Authority == AuthorityEnum.Client) {
                     print("Expected object to have owner as me");
                 }
             }
@@ -120,67 +113,73 @@ namespace OdessaEngine.NETS.Core {
         /// OR 
         /// If this is the server and the server owns this
         /// </summary>
-        public bool OwnedByMe => (state != NetsEntityState.Insync && !ServerControlled) ||
-            (ServerControlled && NetsNetworking.instance?.IsServer == true) ||
+        public bool OwnedByMe => (state != NetsEntityState.Insync && Authority == AuthorityEnum.Client) ||
+            (Authority.IsServerOwned() && NetsNetworking.instance?.IsServer == true) ||
             (NetsNetworking.myAccountGuid != null && NetsNetworking.myAccountGuid == networkModel?.Owner);
         /// <summary>
         /// Use to check if the local account was the creator of this entity
         /// </summary>
         public Guid Creator => networkModel?.Creator ?? NetsNetworking.myAccountGuid ?? default;
         public Guid Owner => networkModel?.Owner ?? default;
-        public bool IsAuthority => OwnedByMe || NetsNetworking.instance?.IsServer == true;
 
         void OnDestroy() {
 #if !UNITY_EDITOR
-        if (IsAuthority == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
+        if (OwnedByMe == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
         NetsNetworking.instance?.DestroyEntity(Id);
 #endif
         }
 
-        public static Dictionary<Type, PropertyInfo[]> fields = new Dictionary<Type, PropertyInfo[]>();
+
+        public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
+        public Dictionary<string, Vector3LerpingObjectProperty> pathToLerp = new Dictionary<string, Vector3LerpingObjectProperty>();
+        public ObjectProperty GetPropertyAtPath(string path) {
+            if (pathToProperty.TryGetValue(path, out var r)) return r;
+            foreach (var t in ObjectsToSync) {
+                foreach (var c in t.Components) {
+                    foreach (var f in c.Fields) {
+                        if (f.PathName == path) {
+                            var component = t.Transform.GetComponents<Component>().Single(com => com.GetType().Name == c.ClassName);
+                            var method = GetValidPropertiesFor(component.GetType()).Single(prop => prop.Name == f.FieldName);
+                            var objProp = new ObjectProperty {
+                                Object = component,
+                                Method = method,
+                                Field = f,
+                            };
+                            pathToProperty[path] = objProp;
+                            return objProp;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
 
         float lastUpdateTime = 0f;
         bool SetPropertiesBeforeCreation = false;
         public void LateUpdate() {
             if (SetPropertiesBeforeCreation == false) {
                 if (state != NetsEntityState.Insync) return;
-                if (IsAuthority == false) return;
+                if (OwnedByMe == false) return;
                 if (Time.time < lastUpdateTime + 1f / SyncFramesPerSecond) return;
             }
             lastUpdateTime = Time.time;
 
             if (OwnedByMe || SetPropertiesBeforeCreation) {
-                if (SyncPosition) localModel.SetVector3(".position", GetPositionTransform().position);
-                if (SyncRotation) localModel.SetVector3(".rotation", GetRotationTransform().eulerAngles);
-                if (SyncScale) localModel.SetVector3(".scale", GetScaleTransform().localScale);
+                foreach (var t in ObjectsToSync) {
+                    foreach (var c in t.Components) {
+                        foreach (var f in c.Fields) {
+                            if (f.Enabled == false) continue;
+                            var objProp = GetPropertyAtPath(f.PathName);
+                            var objectToSave = objProp.Value();
+                            if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
+                            if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
+                            localModel.SetObject(f.PathName, objectToSave);
+                        }
 
-                foreach (var c in transform.GetComponents<ClientNetworked>()) {
-                    var typeName = c.GetType().Name;
-                    if (!fields.ContainsKey(c.GetType())) fields[c.GetType()] = c.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                    foreach (var field in fields[c.GetType()]) {
-                        var objectToSave = field.GetValue(c);
-                        if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
-                        if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
-                        localModel.SetObject($".{typeName}.{field.Name}", objectToSave);
                     }
+
                 }
             }
-
-            if (NetsNetworking.instance?.IsServer == true) {
-                foreach (var c in transform.GetComponents<ServerNetworked>()) {
-                    var typeName = c.GetType().Name;
-                    if (!fields.ContainsKey(c.GetType())) fields[c.GetType()] = c.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                    foreach (var field in fields[c.GetType()]) {
-                        var objectToSave = field.GetValue(c);
-                        if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
-                        if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
-                        localModel.SetObject($".{typeName}.{field.Name}", objectToSave);
-                    }
-                }
-            }
-
-            foreach (var c in transform.GetComponents<NetworkedBehavior>())
-                c.SaveState(localModel);
 
             if (localModel.IsDirty && SetPropertiesBeforeCreation == false) {
                 NetsNetworking.instance.WriteEntityDelta(this, localModel);
@@ -190,54 +189,35 @@ namespace OdessaEngine.NETS.Core {
         public void OnFieldChange(KeyPairEntity entity, string key, bool force = false) {
             if (this == null) return;
             if (OwnedByMe == false || force) {
-                if (key == ".position") {
-                    var value = entity.GetUnityVector3(key);
-                    positionLerp.ValueChanged(value);
-                    if (force) GetPositionTransform().position = value;
-                } else if (key == ".rotation") {
-                    var value = entity.GetUnityVector3(key);
-                    rotationLerp.ValueChanged(value);
-                    GetRotationTransform().eulerAngles = value;
-                } else if (key == ".scale") {
-                    var value = entity.GetUnityVector3(key);
-                    scaleLerp.ValueChanged(value);
-                    GetScaleTransform().localScale = value;
-                }
-            }
-
-            foreach (var c in transform.GetComponents<NetworkedBehavior>())
-                c.OnFieldUpdate(entity, key);
-
-            if (key.StartsWith(".")) {
-                var split = key.Split('.');
-                if (split.Length != 3) return;
-
-                if (OwnedByMe == false || force) {
-                    foreach (var c in transform.GetComponents<ClientNetworked>()) {
-                        if (c.GetType().Name != split[1]) continue;
-                        if (!fields.ContainsKey(c.GetType())) fields[c.GetType()] = c.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                        var field = fields[c.GetType()].SingleOrDefault(f => f.Name == split[2]);
-                        if (field != null) {
-                            var obj = entity.GetObject(key);
-                            if (obj is System.Numerics.Vector2 v2) obj = v2.ToUnityVector2();
-                            if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
-                            field.SetValue(c, obj);
-                        }
+                if (key.StartsWith(".")) {
+                    var objProp = GetPropertyAtPath(key);
+                    if (objProp == null) {
+                        if (key != NetsNetworking.CreationGuidFieldName) Debug.Log("Unable to find path: " + key);
+                        return;
                     }
-                }
 
-                if (NetsNetworking.instance.IsServer == false) {
-                    foreach (var c in transform.GetComponents<ServerNetworked>()) {
-                        if (c.GetType().Name != split[1]) continue;
-                        if (!fields.ContainsKey(c.GetType())) fields[c.GetType()] = c.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                        var field = fields[c.GetType()].SingleOrDefault(f => f.Name == split[2]);
-                        if (field != null) {
-                            var obj = entity.GetObject(key);
-                            if (obj is System.Numerics.Vector2 v2) obj = v2.ToUnityVector2();
-                            if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
-                            field.SetValue(c, obj);
+                    var obj = entity.GetObject(key);
+                    if (obj is System.Numerics.Vector2 v2) obj = v2.ToUnityVector2();
+                    if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
+
+                    // Check lerps
+                    if (objProp.Field.FieldType == "Vector3" && objProp.Field.LerpType != LerpType.None) {
+                        if (!pathToLerp.TryGetValue(key, out var lerpObj)) {
+                            lerpObj = pathToLerp[key] = new Vector3LerpingObjectProperty {
+                                Field = objProp.Field,
+                                Object = objProp.Object,
+                                Method = objProp.Method,
+                                Lerp = new Vector3AdaptiveLerp(),
+                            };
+                            lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
+                            lerpObj.Lerp.type = objProp.Field.LerpType;
                         }
+                        lerpObj.Lerp.ValueChanged((Vector3)obj);
+                        return;
                     }
+
+                    // Else set property directly
+                    objProp.SetValue(obj);
                 }
             }
         }
@@ -260,36 +240,19 @@ namespace OdessaEngine.NETS.Core {
                 //if (NetsNetworking.instance.canSend == false) return;
 
                 if (!OwnedByMe && state == NetsEntityState.Insync) {
-                    if (SyncPosition) GetPositionTransform().position = positionLerp.GetLerped();
-                    if (SyncRotation) GetRotationTransform().eulerAngles = rotationLerp.GetLerped();
-                    if (SyncScale) GetScaleTransform().localScale = scaleLerp.GetLerped();
+                    // Run through lerps
+                    //if (SyncPosition) GetPositionTransform().position = positionLerp.GetLerped();
+                    foreach (var lo in pathToLerp.Values) {
+                        lo.SetValue(lo.Lerp.GetLerped());
+                    }
                 } else {
-                    positionLerp.ValueChanged(GetPositionTransform().position);
-                    rotationLerp.ValueChanged(GetRotationTransform().eulerAngles);
-                    scaleLerp.ValueChanged(GetScaleTransform().localScale);
+                    foreach (var c in transform.GetComponents<NetsBehavior>())
+                        c.NetsUpdate();
                 }
-
-                if (OwnedByMe)
-                    foreach (var c in transform.GetComponents<NetworkedBehavior>())
-                        c.OwnedUpdate();
-
-                if (NetsNetworking.instance.IsServer)
-                    foreach (var c in transform.GetComponents<NetworkedBehavior>())
-                        c.ServerUpdate();
-
-                if (OwnedByMe)
-                    foreach (var c in transform.GetComponents<ClientNetworked>())
-                        c.OwnedUpdate();
-
-                if (NetsNetworking.instance.IsServer)
-                    foreach (var c in transform.GetComponents<ServerNetworked>())
-                        c.ServerUpdate();
             }
 
 #if UNITY_EDITOR
             if (Application.isPlaying) return;
-
-            if (ServerControlled == false && ServerSingleton == true) ServerSingleton = false;
 
             var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
 
@@ -307,6 +270,50 @@ namespace OdessaEngine.NETS.Core {
                 }
                 component.prefab = prefab.name;
             }
+
+            // Fill in Objects to sync
+            if (ObjectsToSync.Any(o => o.Transform == transform) == false)
+                ObjectsToSync.Add(new ObjectToSync {
+                    Transform = transform,
+                    Components = new List<ComponentsToSync>(),
+                });
+
+            foreach (var obj in ObjectsToSync) {
+                obj.IsSelf = false;//obj.Transform == transform;
+                var components = obj.Transform.GetComponents<Component>();
+
+                foreach (var comp in components) {
+                    if (comp is NetsEntity) continue;
+
+                    var componentToSync = obj.Components.FirstOrDefault(f => f.ClassName == comp.GetType().Name);
+                    if (componentToSync == null) {
+                        componentToSync = new ComponentsToSync {
+                            ClassName = comp.GetType().Name,
+                            Fields = new List<ScriptFieldToSync>(),
+                        };
+                        obj.Components.Add(componentToSync);
+                    }
+
+                    var componentFields = new List<ScriptFieldToSync>();
+                    var props = GetValidPropertiesFor(comp.GetType());
+                    foreach (var p in props) {
+                        var propToSync = componentToSync.Fields.FirstOrDefault(f => f.FieldName == p.Name);
+                        if (propToSync == null) {
+                            propToSync = new ScriptFieldToSync {
+                                FieldName = p.Name,
+                                PathName = "." + comp.GetType().Name + "." + p.Name,
+                                Enabled = true,
+                                LerpType = LerpType.Velocity,
+                            };
+                            componentToSync.Fields.Add(propToSync);
+                        }
+                        propToSync.FieldType = p.PropertyType.Name;
+                    }
+                    componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
+                }
+                obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
+            }
+
 #endif
         }
         private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();
@@ -318,7 +325,7 @@ namespace OdessaEngine.NETS.Core {
             // Get the public methods.
             // We can garuntee that get components will return the same order every time https://answers.unity.com/questions/1293957/reliable-order-of-components-using-getcomponents.html
             foreach (var comp in gameObject.GetComponents<MonoBehaviour>()) {
-                if (comp.GetType() is NetsEntity) continue;
+                if (comp is NetsEntity) continue;
                 var type = comp.GetType();
                 foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)) {
                     var index = methodIndex;
@@ -383,5 +390,39 @@ namespace OdessaEngine.NETS.Core {
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10 });
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
 
+    }
+
+    [Serializable]
+    public class ObjectToSync {
+        public Transform Transform;
+        public List<ComponentsToSync> Components;
+        public bool IsSelf;
+    }
+
+    [Serializable]
+    public class ComponentsToSync {
+        public string ClassName;
+        public List<ScriptFieldToSync> Fields;
+    }
+
+    [Serializable]
+    public class ScriptFieldToSync {
+        public string FieldName;
+        public string PathName;
+        public bool Enabled;
+        public string FieldType;
+        public LerpType LerpType = LerpType.None;
+    }
+
+    public class ObjectProperty {
+        public object Object { get; set; }
+        public PropertyInfo Method { get; set; }
+        public ScriptFieldToSync Field { get; set; }
+        public object Value() => Method.GetValue(Object);
+        public void SetValue(object value) => Method.SetValue(Object, value);
+    }
+
+    public class Vector3LerpingObjectProperty : ObjectProperty {
+        public Vector3AdaptiveLerp Lerp { get; set; }
     }
 }
