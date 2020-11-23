@@ -212,7 +212,7 @@ namespace OdessaEngine.NETS.Core {
                 }));
                 yield break;
             }
-            CreateOrJoinRoom(URL + ":" + RoomServicePort, DefaultRoomName);
+            CreateOrJoinRoom("roomservice.nets.odessaengine.com", DefaultRoomName);
             ips.Reverse();
         }
 
