@@ -188,7 +188,7 @@ namespace OdessaEngine.NETS.Core {
 		public IEnumerator Start() {
             if (!Application.isPlaying) yield break;
 
-            if (UseLocal) URL = "localhost";
+            if (UseLocal) URL = "127.0.0.1";
             instance = this;
             //GameInstance.placeholderEntities = showPlaceholderPrefabs;
 
@@ -212,6 +212,8 @@ namespace OdessaEngine.NETS.Core {
                 }));
                 yield break;
             }
+            if (!usingSecure)
+                URL = $"{URL}:{RoomServicePort}";
             CreateOrJoinRoom(URL, DefaultRoomName);
             ips.Reverse();
         }
