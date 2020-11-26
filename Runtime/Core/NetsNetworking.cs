@@ -290,7 +290,7 @@ namespace OdessaEngine.NETS.Core {
                 };
                 keyPairEntityCollectors[roomGuid].AfterKeyChanged = async (entity, field) => {
                     try {
-                        //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}.{field.Name} => {field.Value}");
+                        //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                         if (entity.Id == 1) {
                             if (entity.PrefabName == "Room") {
                                 print("PlayerCount: " + entity.GetInt("PlayerCount"));

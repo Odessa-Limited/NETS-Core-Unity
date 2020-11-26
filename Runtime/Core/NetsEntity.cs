@@ -36,9 +36,11 @@ namespace OdessaEngine.NETS.Core {
 
         private static PropertyInfo[] GetValidPropertiesFor(Type t) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(p => p.GetAccessors().Length == 2)
             .Where(p => !p.GetGetMethod().IsStatic)
             .Where(p => t != typeof(Transform) || new string[] { "localPosition", "localEulerAngles", "localScale" }.Contains(p.Name))
             .Where(p => t != typeof(Rigidbody2D) || new string[] { "velocity", "angularVelocity", "mass", "linearDrag", "angularDrag" }.Contains(p.Name))
+            .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
             .ToArray();
 
         public enum NetsEntityState {
@@ -137,16 +139,22 @@ namespace OdessaEngine.NETS.Core {
             foreach (var t in ObjectsToSync) {
                 foreach (var c in t.Components) {
                     foreach (var f in c.Fields) {
-                        if (f.PathName == path) {
-                            var component = t.Transform.GetComponents<Component>().Single(com => com.GetType().Name == c.ClassName);
-                            var method = GetValidPropertiesFor(component.GetType()).Single(prop => prop.Name == f.FieldName);
-                            var objProp = new ObjectProperty {
-                                Object = component,
-                                Method = method,
-                                Field = f,
-                            };
-                            pathToProperty[path] = objProp;
-                            return objProp;
+                        try {
+                            if (f.PathName == path) {
+                                var component = t.Transform.GetComponents<Component>().SingleOrDefault(com => com.GetType().Name == c.ClassName);
+                                if (component == null) throw new Exception("unknown component for path " + path);
+                                var method = GetValidPropertiesFor(component.GetType()).SingleOrDefault(prop => prop.Name == f.FieldName);
+                                if (method == null) throw new Exception("unknown method for path " + path);
+                                var objProp = new ObjectProperty {
+                                    Object = component,
+                                    Method = method,
+                                    Field = f,
+                                };
+                                pathToProperty[path] = objProp;
+                                return objProp;
+                            }
+                        } catch (Exception e) {
+                            Debug.LogError("Unable to get property at path " + path + ". Error: " + e.Message);
                         }
                     }
                 }
@@ -246,7 +254,7 @@ namespace OdessaEngine.NETS.Core {
                         lo.SetValue(lo.Lerp.GetLerped());
                     }
                 } else {
-                    foreach (var c in transform.GetComponents<NetsBehavior>())
+                    foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
                         c.NetsUpdate();
                 }
             }
@@ -301,13 +309,14 @@ namespace OdessaEngine.NETS.Core {
                         if (propToSync == null) {
                             propToSync = new ScriptFieldToSync {
                                 FieldName = p.Name,
-                                PathName = "." + comp.GetType().Name + "." + p.Name,
+                                //PathName = "." + obj.Transform + "." + comp.GetType().Name + "." + p.Name,
                                 Enabled = true,
                                 LerpType = LerpType.Velocity,
                             };
                             componentToSync.Fields.Add(propToSync);
                         }
                         propToSync.FieldType = p.PropertyType.Name;
+                        propToSync.PathName = "." + obj.Transform.name + "." + comp.GetType().Name + "." + p.Name;
                     }
                     componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
                 }

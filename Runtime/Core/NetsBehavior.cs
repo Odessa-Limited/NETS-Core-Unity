@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
-    [RequireComponent(typeof(NetsEntity))]
     public class NetsBehavior : MonoBehaviour {
         private NetsEntity _netsEntity;
         public NetsEntity Entity {
