@@ -6,6 +6,7 @@ namespace OdessaEngine.NETS.Core {
 		Velocity,
 		Smooth,
 		Linear,
+		SphericalLinear,
 	}
 
 	public abstract class AdaptiveLerp<T> {
@@ -33,6 +34,7 @@ namespace OdessaEngine.NETS.Core {
 		protected abstract T LinearLerp(T a, T b, float value);
 		protected abstract T SoftLerp(T a, T b, float value);
 		protected abstract T Bezier2(T a, T b, T c, float value);
+		protected abstract T SphericalLinearLerp(T a, T b, float value);
 
 		private void SetLastObject(T o) {
 			previousValueAfterVelocity = LinearLerp(LinearLerp(previousValue, currentValue, velocityExterpolationAmount), o, velocityCorrectionAmount);
@@ -83,7 +85,9 @@ namespace OdessaEngine.NETS.Core {
 			if (type == LerpType.Smooth)
 				lastReturnedValue = SoftLerp(previousValue, currentValue, percent);
 			else if (type == LerpType.Linear)
-				lastReturnedValue = LinearLerp(previousValue, currentValue, percent);
+				lastReturnedValue = LinearLerp(previousValue, currentValue, percent * 0.9f);
+			else if (type == LerpType.SphericalLinear)
+				lastReturnedValue = SphericalLinearLerp(previousValue, currentValue, percent * 0.9f);
 			else if (type == LerpType.Velocity)
 				lastReturnedValue = Bezier2(previousValue, previousValueAfterVelocity, currentValue, percent);
 			return lastReturnedValue;
@@ -94,7 +98,7 @@ namespace OdessaEngine.NETS.Core {
 	public class Vector3AdaptiveLerp : AdaptiveLerp<Vector3> {
 		protected override float Distance(Vector3 a, Vector3 b) => (a - b).magnitude;
 
-		protected override Vector3 LinearLerp(Vector3 a, Vector3 b, float value) => a + (b - a) * value;
+		protected override Vector3 LinearLerp(Vector3 a, Vector3 b, float value) => Vector3.Lerp(a, b, value);
 
 		protected override Vector3 SoftLerp(Vector3 a, Vector3 b, float value) => new Vector3(
 			Mathf.SmoothStep(a.x, b.x, value),
@@ -106,6 +110,8 @@ namespace OdessaEngine.NETS.Core {
 			float rt = 1 - t;
 			return rt * rt * s + 2 * rt * t * p + t * t * e;
 		}
+
+		protected override Vector3 SphericalLinearLerp(Vector3 a, Vector3 b, float value) => Quaternion.Slerp(Quaternion.Euler(a), Quaternion.Euler(b), value).eulerAngles;
 
 		protected override Vector3 Default() => Vector3.zero;
 	}
