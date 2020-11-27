@@ -520,10 +520,10 @@ namespace OdessaEngine.NETS.Core {
         }
 #endif
         /// <summary>
-        /// Create and or join a room by Name. This is a Http request so requires a callback when the request is complete
-        /// Logic flow:
-        /// <b>IF</b> the room exists join it
-        /// Else the room does <b>NOT</b> exist create it <b>AND</b> join it
+        /// Create and or join a room by Name. This is a Http request so requires a callback when the request is complete.
+        /// <para>Logic flow:</para>
+        /// <para><b>IF</b> the room exists join it</para>
+        /// <para>Else the room does <b>NOT</b> exist create it <b>AND</b> join it</para>
         /// </summary>
         /// 
         /// <remarks>
@@ -536,7 +536,7 @@ namespace OdessaEngine.NETS.Core {
         /// </remarks>
         /// 
         /// <example>
-        /// CreateOrJoinRoom("Lobby1", ()=>{UIManager.SwapToLobbyUI();}, 30);
+        /// CreateOrJoinRoom("Room1", (RoomState)=>{UIManager.SwapToLobbyUI();}, 30);
         /// </example>
         /// 
         /// <param name="RoomName">Room name to try to Create or Join. Can be anything, does not need to exist. Random Guid string would be an easy way to create generic random rooms</param>
@@ -544,19 +544,95 @@ namespace OdessaEngine.NETS.Core {
         /// <param name="NoPlayerTTL">IF the room is created, how long should the room stay alive with 0 players in it. Reccomended above 0 as 0 may cause issues. Default is 30 seconds.</param>
         /// 
         /// <code>
-        /// CreateOrJoinRoom("Lobby1", ()=>{UIManager.SwapToLobbyUI();}, 30);
+        /// CreateOrJoinRoom("Room1", (RoomState)=>{UIManager.SwapToLobbyUI();}, 30);
         /// </code>
         /// 
         public static void CreateOrJoinRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             instance.InternalCreateOrJoinRoom(RoomName, CallBack, NoPlayerTTL);
         }
 
+        /// <summary>
+        /// Create a room by Name. This is a Http request so requires a callback when the request is complete.
+        /// <para>Logic flow:</para>
+        /// <para><b>IF</b> the room name <b>DOES NOT</b> exists create it. (This will not automatically join the room)</para>
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Basic and fundemental room connection for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// CreateRoom("Room2", (RoomState)=>{RoomAvailabliltyManager.AddAvailableRooms(RoomState);}, 30);
+        /// </example>
+        /// 
+        /// <param name="RoomName">Room name to try to Create. Can be any string. Random Guid string would be an easy way to create generic random rooms</param>
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// <param name="NoPlayerTTL">IF the room is created, how long should the room stay alive with 0 players in it. Reccomended above 0 as 0 may cause issues. Default is 30 seconds.</param>
+        /// 
+        /// <code>
+        /// CreateRoom("Room2", (RoomState)=>{RoomAvailabliltyManager.AddAvailableRooms(RoomState);}, 30);
+        /// </code>
+        /// 
         public static void CreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             instance.InternalCreateRoom(RoomName, CallBack, NoPlayerTTL);
         }
+        /// <summary>
+        /// Join a by Name. This is a Http request so requires a callback when the request is complete.
+        /// <para>Logic flow:</para>
+        /// <para><b>IF</b> the room name <b>DOES</b> exist <b>THEN</b> join it.</para>
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Basic and fundemental room connection for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// </example>
+        /// 
+        /// <param name="RoomName">Room name to try to Join. Can be any string, but must have been created by <see cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/> or by listed by <see cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/></param>
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// 
+        /// <code>
+        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// </code>
+        /// 
         public static void JoinRoom(string RoomName, Action<RoomState> CallBack = null) {
             instance.InternalJoinRoom(RoomName, CallBack);
         }
+        /// <summary>
+        /// Get all available rooms. This is a Http request so requires a callback when the request is complete.
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Basic and fundemental room connection for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// GetAllRooms(( RoomStates ) => { UiManager.RoomSelection.UpdateList(RoomStates); });
+        /// </example>
+        /// 
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// 
+        /// <code>
+        /// GetAllRooms(( RoomStates ) => { UiManager.RoomSelection.UpdateList(RoomStates); });
+        /// </code>
+        /// 
         public static void GetAllRooms(Action<List<RoomState>> CallBack) {
             instance.InternalGetAllRooms(CallBack);
         }
