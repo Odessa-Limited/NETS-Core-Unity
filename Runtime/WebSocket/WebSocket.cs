@@ -39,6 +39,9 @@ public class WebSocket
 #if UNITY_WEBGL && !UNITY_EDITOR
 	[DllImport("__Internal")]
 	private static extern int SocketCreate (string url);
+	
+	[DllImport("__Internal")]
+	private static extern bool Ready ();
 
 	[DllImport("__Internal")]
 	private static extern int SocketState (int socketInstance);
@@ -90,6 +93,14 @@ public class WebSocket
 			yield return 0;
         }
 	}
+    
+    public bool isReady
+    {
+        get
+        {
+            return Ready();
+        }
+    }
     
     public int getState
     {
@@ -195,6 +206,11 @@ public class WebSocket
         {
             return m_IsConnected ? 1 : 0;
         }
-    }
+	}
+	public bool isReady {
+		get {
+			return true;
+		}
+	}
 #endif
 }

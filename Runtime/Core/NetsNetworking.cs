@@ -391,6 +391,12 @@ namespace OdessaEngine.NETS.Core {
             }
 
             conn = new WebSocket(new Uri(url));
+
+            print("waiting for ready");
+            while (conn.isReady == false) {
+                yield return new WaitForSeconds(.03f); // Wait for iframe to postback
+            }
+
             print("attempting connect");
             yield return StartCoroutine(conn.Connect());
             if (debugConnections)
