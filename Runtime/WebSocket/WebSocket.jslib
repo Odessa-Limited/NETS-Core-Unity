@@ -88,7 +88,7 @@ var LibraryWebSockets = {
 	SocketSend: function (socketInstance, ptr, length)
 	{
 		var socket = webSocketInstances[socketInstance];
-		this.iframe.contentWindow.postMessage({method:"SocketCreate",data:{url: url, data: HEAPU8.buffer.slice(ptr, ptr+length)}},"*");
+		this.iframe.contentWindow.postMessage({method:"SocketSend",data:{url: socket.url, data: HEAPU8.buffer.slice(ptr, ptr+length)}},"*");
 	},
 
 	SocketRecvLength: function(socketInstance)
