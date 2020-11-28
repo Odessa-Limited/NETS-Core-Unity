@@ -54,7 +54,6 @@ var LibraryWebSockets = {
 		url = Pointer_stringify(url);
 
 		var existingIndex = -1;
-		console.log(this)
 		for (i = 0; i < this.$webSocketInstances.length; i++)
 			if (this.$webSocketInstances[i].url == url) existingIndex = i;
 		if (existingIndex >= 0) return existingIndex;
