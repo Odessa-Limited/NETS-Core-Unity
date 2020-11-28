@@ -61,9 +61,6 @@ public class WebSocket
 	[DllImport("__Internal")]
 	private static extern int SocketError (int socketInstance, byte[] ptr, int length);
 
-	[DllImport("__Internal")]
-	private static extern void InjectIframe ();
-
 	int m_NativeRef = 0;
 
 	public void Send(byte[] buffer)
@@ -83,7 +80,6 @@ public class WebSocket
 
 	public IEnumerator Connect()
 	{
-		InjectIframe();
 		m_NativeRef = SocketCreate (mUrl.ToString());
 
         long startTime = System.DateTime.Now.Ticks;
