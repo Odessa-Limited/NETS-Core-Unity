@@ -27,10 +27,10 @@ var LibraryWebSockets = {
 				}
 
 				var index = -1;
-				for (i = 0; i < thisObj.$webSocketInstances.length; i++)
-					if (thisObj.$webSocketInstances[i].url == e.data.data.url) index = i;
+				for (i = 0; i < webSocketInstances.length; i++)
+					if (webSocketInstances[i].url == e.data.data.url) index = i;
 
-				var socket = thisObj.$webSocketInstances[index];
+				var socket = webSocketInstances[index];
 				if (e.data.method == "SocketError"){
 					socket.error = e.data.data.error;
 				} else if (e.data.method == "onopen"){
