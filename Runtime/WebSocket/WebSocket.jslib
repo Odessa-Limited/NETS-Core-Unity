@@ -1,11 +1,10 @@
-var iframe = document.createElement('iframe');
-iframe.style.display = "none";
-iframe.src = "https://wss.nets.odessaengine.com/";
-document.body.appendChild(iframe);
-var iframeScripts = iframe.contentWindow;
-
 var LibraryWebSockets = {
-	$webSocketInstances: [],
+	
+	var iframe = document.createElement('iframe');
+	iframe.style.display = "none";
+	iframe.src = "https://wss.nets.odessaengine.com/";
+	document.body.appendChild(iframe);
+	var iframeScripts = iframe.contentWindow;
 
 	SocketCreate: function(url)
 	{
