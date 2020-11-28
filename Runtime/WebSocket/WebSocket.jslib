@@ -40,7 +40,7 @@ var LibraryWebSockets = {
 					socket.state = 3;
 					socket.url = ""
 				} else if (e.data.method == "onmessage"){
-					socket.messages.push(e.data.data);
+					socket.messages.push(e.data.data.data);
 				}
 			});
 
