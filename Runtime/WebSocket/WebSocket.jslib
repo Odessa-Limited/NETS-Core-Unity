@@ -52,7 +52,7 @@ var LibraryWebSockets = {
 
 	SocketCreate: function(url)
 	{
-		//url = Pointer_stringify(url);
+		url = Pointer_stringify(url);
 		var existingIndex = this.GetSocketInstanceWithURL(url);
 		if (existingIndex >= 0) return existingIndex;
 
