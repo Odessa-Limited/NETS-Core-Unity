@@ -58,6 +58,9 @@ public class WebSocket
 	[DllImport("__Internal")]
 	private static extern int SocketError (int socketInstance, byte[] ptr, int length);
 
+	[DllImport("__Internal")]
+	private static extern void InjectIframe ();
+
 	int m_NativeRef = 0;
 
 	public void Send(byte[] buffer)
@@ -77,9 +80,9 @@ public class WebSocket
 
 	public IEnumerator Connect()
 	{
+		InjectIframe();
 		m_NativeRef = SocketCreate (mUrl.ToString());
 
-    
         long startTime = System.DateTime.Now.Ticks;
 		while (SocketState(m_NativeRef) == 0){
             if ((System.DateTime.Now.Ticks - startTime) / 10000000 > 10)
@@ -123,7 +126,7 @@ public class WebSocket
         }
     }
 #else
-    WebSocketSharp.WebSocket m_Socket;
+	WebSocketSharp.WebSocket m_Socket;
 	Queue<byte[]> m_Messages = new Queue<byte[]>();
 	string m_Error = null;
 

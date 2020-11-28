@@ -2,59 +2,45 @@ var LibraryWebSockets = {
 
 	SocketCreate: function(url)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
 		var str = Pointer_stringify(url);
-		return iframeScripts.SocketCreate(str);
+		return window.iframeScripts.SocketCreate(str);
 	},
 
 	SocketState: function (socketInstance)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		return iframeScripts.SocketState(socketInstance);
+		return window.iframeScripts.SocketState(socketInstance);
 	},
 
 	SocketError: function (socketInstance, ptr, bufsize)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		return iframeScripts.SocketError(socketInstance, ptr, bufsize);
+		return window.iframeScripts.SocketError(socketInstance, ptr, bufsize);
 	},
 
 	SocketSend: function (socketInstance, ptr, length)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		iframeScripts.SocketSend(socketInstance, ptr, length);
+		window.iframeScripts.SocketSend(socketInstance, ptr, length);
 	},
 
 	SocketRecvLength: function(socketInstance)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		return iframeScripts.SocketRecvLength(socketInstance);
+		return window.iframeScripts.SocketRecvLength(socketInstance);
 	},
 
 	SocketRecv: function (socketInstance, ptr, length)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		iframeScripts.SocketRecv(socketInstance, ptr, length);
+		window.iframeScripts.SocketRecv(socketInstance, ptr, length);
 	},
 
 	SocketClose: function (socketInstance)
 	{
-		if(!iframeScripts)
-			this.InjectIframe();
-		iframeScripts.SocketClose(socketInstance);
+		window.iframeScripts.SocketClose(socketInstance);
 	},
 	InjectIframe: function(){
 		var iframe = document.createElement('iframe');
 		iframe.style.display = "none";
 		iframe.src = "https://wss.nets.odessaengine.com/";
 		document.body.appendChild(iframe);
-		var iframeScripts = iframe.contentWindow;
+		window.iframeScripts = iframe.contentWindow;
 	}
 };
 
