@@ -5,6 +5,12 @@ var LibraryWebSockets = {
 	initialized: false,
 	iframe: null,
 
+	GetSocketInstanceWithURL: function(url){
+		for (i = 0; i < this.$webSocketInstances.length; i++)
+			if (this.$webSocketInstances[i].url == url) return i;
+		return -1;
+	},
+
 	Ready: function ()
 	{
 		if (this.initialized == true) return true;
@@ -16,18 +22,25 @@ var LibraryWebSockets = {
 			this.iframe.src = "https://wss.nets.odessaengine.com/";
 			document.body.appendChild(this.iframe);
 
-			thisObj = this;
+			var thisObj = this;
 			window.addEventListener("message", function(e) {
+				if (e.origin != "https://wss.nets.odessaengine.com") return;
+				//console.log(e)
+
 				if (e.data.method == "Initialized"){
 					thisObj.initialized = true;
-				} else if (e.data.method == "SocketError"){
-					thisObj.$webSocketInstances[e.data.url].error = e.data.error;
+					return;
+				}
+				var socket = thisObj.$webSocketInstances[thisObj.GetSocketInstanceWithURL(e.data.data.url)];
+				if (e.data.method == "SocketError"){
+					socket.error = e.data.data.error;
 				} else if (e.data.method == "onopen"){
-					thisObj.$webSocketInstances[e.data.url].state = 1;
+					socket.state = 1;
 				} else if (e.data.method == "onclose"){
-					thisObj.$webSocketInstances[e.data.url].state = 3;
+					socket.state = 3;
+					socket.url = ""
 				} else if (e.data.method == "onmessage"){
-					thisObj.$webSocketInstances[e.data.url].messages.push(e.data.data);
+					socket.messages.push(e.data.data);
 				}
 			});
 
@@ -40,9 +53,9 @@ var LibraryWebSockets = {
 	SocketCreate: function(url)
 	{
 		//url = Pointer_stringify(url);
+		var existingIndex = this.GetSocketInstanceWithURL(url);
+		if (existingIndex >= 0) return existingIndex;
 
-		for (i = 0; i < this.$webSocketInstances.length; i++)
-			if (this.$webSocketInstances[i].url == url) return i;
 
 		var socket = {
 			url: url,
@@ -99,6 +112,7 @@ var LibraryWebSockets = {
 	SocketClose: function (socketInstance)
 	{
 		var socket = this.$webSocketInstances[socketInstance];
+		socket.url = ""
 		this.iframe.contentWindow.postMessage({method:"SocketClose",data:url},"*");
 	}
 };
