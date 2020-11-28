@@ -5,12 +5,6 @@ var LibraryWebSockets = {
 	initialized: false,
 	iframe: null,
 
-	GetSocketInstanceWithURL: function(url){
-		for (i = 0; i < this.$webSocketInstances.length; i++)
-			if (this.$webSocketInstances[i].url == url) return i;
-		return -1;
-	},
-
 	Ready: function ()
 	{
 		if (this.initialized == true) return true;
@@ -31,7 +25,12 @@ var LibraryWebSockets = {
 					thisObj.initialized = true;
 					return;
 				}
-				var socket = thisObj.$webSocketInstances[thisObj.GetSocketInstanceWithURL(e.data.data.url)];
+
+				var index = -1;
+				for (i = 0; i < thisObj.$webSocketInstances.length; i++)
+					if (thisObj.$webSocketInstances[i].url == e.data.data.url) index = i;
+
+				var socket = thisObj.$webSocketInstances[index];
 				if (e.data.method == "SocketError"){
 					socket.error = e.data.data.error;
 				} else if (e.data.method == "onopen"){
@@ -53,9 +52,12 @@ var LibraryWebSockets = {
 	SocketCreate: function(url)
 	{
 		url = Pointer_stringify(url);
-		var existingIndex = this.GetSocketInstanceWithURL(url);
-		if (existingIndex >= 0) return existingIndex;
 
+		var existingIndex = -1;
+		console.log(this)
+		for (i = 0; i < this.$webSocketInstances.length; i++)
+			if (this.$webSocketInstances[i].url == url) existingIndex = i;
+		if (existingIndex >= 0) return existingIndex;
 
 		var socket = {
 			url: url,
