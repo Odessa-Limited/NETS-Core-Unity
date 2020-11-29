@@ -13,7 +13,7 @@ var LibraryWebSockets = {
 			this.iframe = document.createElement('iframe');
 			this.iframe.id = "nets_iframe"
 			this.iframe.style.display = "none";
-			this.iframe.src = "https://wss.nets.odessaengine.com/";
+			this.iframe.src = "https://wss.nets.odessaengine.com?version=" + Math.random();
 			document.body.appendChild(this.iframe);
 
 			var thisObj = this;
@@ -38,6 +38,7 @@ var LibraryWebSockets = {
 				} else if (e.data.method == "onclose"){
 					socket.state = 3;
 					socket.url = ""
+					if (e.data.data.error != null) socket.error = e.data.data.error;
 				} else if (e.data.method == "onmessage"){
 					socket.messages.push(e.data.data.data);
 				}
@@ -113,8 +114,8 @@ var LibraryWebSockets = {
 	SocketClose: function (socketInstance)
 	{
 		var socket = webSocketInstances[socketInstance];
+		this.iframe.contentWindow.postMessage({method:"SocketClose",data:socket.url},"*");
 		socket.url = ""
-		this.iframe.contentWindow.postMessage({method:"SocketClose",data:url},"*");
 	}
 };
 
