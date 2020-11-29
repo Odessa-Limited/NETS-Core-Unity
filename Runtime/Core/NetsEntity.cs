@@ -130,7 +130,9 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
             if (OwnedByMe == false && destroyedByServer == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
-            NetsNetworking.instance?.DestroyEntity(Id);
+            if (destroyedByServer == false) {
+                NetsNetworking.instance?.DestroyEntity(Id);
+            }
         }
 
         public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
