@@ -33,6 +33,7 @@ namespace OdessaEngine.NETS.Core {
         public Guid roomGuid;
         public Guid? creationGuid;
         NetsEntityState state;
+        public bool destroyedByServer = false;
 
         private static PropertyInfo[] GetValidPropertiesFor(Type t) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
@@ -125,12 +126,12 @@ namespace OdessaEngine.NETS.Core {
         public Guid Owner => networkModel?.Owner ?? default;
 
         void OnDestroy() {
-#if !UNITY_EDITOR
-        if (OwnedByMe == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
-        NetsNetworking.instance?.DestroyEntity(Id);
+#if UNITY_EDITOR
+            if (Application.isPlaying == false) return;
 #endif
+            if (OwnedByMe == false && destroyedByServer == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
+            NetsNetworking.instance?.DestroyEntity(Id);
         }
-
 
         public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
         public Dictionary<string, Vector3LerpingObjectProperty> pathToLerp = new Dictionary<string, Vector3LerpingObjectProperty>();

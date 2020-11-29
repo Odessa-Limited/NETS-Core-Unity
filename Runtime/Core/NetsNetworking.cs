@@ -302,9 +302,9 @@ namespace OdessaEngine.NETS.Core {
                                         print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
                                         localServerEntities.ForEach(e => {
                                             var comp = e.GetComponent<NetsEntity>();
+                                            comp.destroyedByServer = true; // Avoid throwing
                                             KnownServerSingletons.Remove(comp.prefab);
                                             Destroy(e.gameObject);
-
                                         });
                                     }
                                     recievedFirstPacket = true;
@@ -333,7 +333,10 @@ namespace OdessaEngine.NETS.Core {
                 keyPairEntityCollectors[roomGuid].AfterEntityRemoved = async (entity) => {
                     try {
                         //print($"Removed {entity.Id}.{entity.PrefabName}");
-                        if (entityIdToNetsEntity[roomGuid].TryGetValue(entity.Id, out var e) && e != null && e.gameObject != null) Destroy(e.gameObject);
+                        if (entityIdToNetsEntity[roomGuid].TryGetValue(entity.Id, out var e) && e != null && e.gameObject != null) {
+                            e.destroyedByServer = true;
+                            Destroy(e.gameObject);
+                        }
                         entityIdToNetsEntity[roomGuid].Remove(entity.Id);
                         await Task.CompletedTask;
                     } catch (Exception e) {
