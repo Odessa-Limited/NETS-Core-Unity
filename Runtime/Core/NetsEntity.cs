@@ -38,7 +38,7 @@ namespace OdessaEngine.NETS.Core {
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Where(p => p.GetAccessors().Length == 2)
             .Where(p => !p.GetGetMethod().IsStatic)
-            .Where(p => t != typeof(Transform) || new string[] { "localPosition", "localEulerAngles", "localScale" }.Contains(p.Name))
+            .Where(p => t != typeof(Transform) || new string[] { "localPosition", "eulerAngles", "localScale" }.Contains(p.Name))
             .Where(p => t != typeof(Rigidbody2D) || new string[] { "velocity", "angularVelocity", "mass", "linearDrag", "angularDrag" }.Contains(p.Name))
             .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
             .ToArray();
