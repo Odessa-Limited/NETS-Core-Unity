@@ -40,7 +40,14 @@ var LibraryWebSockets = {
 					socket.url = ""
 					if (e.data.data.error != null) socket.error = e.data.data.error;
 				} else if (e.data.method == "onmessage"){
-					socket.messages.push(e.data.data.data);
+					socket.waitingMessages[e.data.data.seq] = e.data.data.data;
+					
+					while (true){
+						if (socket.waitingMessages[socket.lastRecieve + 1] == null) return;
+						socket.messages.push(socket.toSend[socket.lastRecieve + 1]);
+						delete socket.toSend[socket.lastRecieve + 1];
+						socket.lastRecieve++;
+					}
 				}
 			});
 
@@ -64,7 +71,10 @@ var LibraryWebSockets = {
 			buffer: new Uint8Array(0),
 			error: null,
 			messages: [],
-			state: 0
+			waitingMessages: [],
+			state: 0,
+			lastRecieve: 0,
+			lastSend: 0
 		}
 		var instance = webSocketInstances.push(socket) - 1;
 		this.iframe.contentWindow.postMessage({method:"SocketCreate",data:url},"*");
@@ -89,7 +99,7 @@ var LibraryWebSockets = {
 	SocketSend: function (socketInstance, ptr, length)
 	{
 		var socket = webSocketInstances[socketInstance];
-		this.iframe.contentWindow.postMessage({method:"SocketSend",data:{url: socket.url, data: HEAPU8.buffer.slice(ptr, ptr+length)}},"*");
+		this.iframe.contentWindow.postMessage({method:"SocketSend",data:{url: socket.url, seq: ++socket.lastSend, data: HEAPU8.buffer.slice(ptr, ptr+length)}},"*");
 	},
 
 	SocketRecvLength: function(socketInstance)
