@@ -44,8 +44,8 @@ var LibraryWebSockets = {
 					
 					while (true){
 						if (socket.waitingMessages[socket.lastRecieve + 1] == null) return;
-						socket.messages.push(socket.toSend[socket.lastRecieve + 1]);
-						delete socket.toSend[socket.lastRecieve + 1];
+						socket.messages.push(socket.waitingMessages[socket.lastRecieve + 1]);
+						delete socket.waitingMessages[socket.lastRecieve + 1];
 						socket.lastRecieve++;
 					}
 				}
