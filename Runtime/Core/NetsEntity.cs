@@ -73,6 +73,8 @@ namespace OdessaEngine.NETS.Core {
         }
 
         private void TryCreateOnServer() {
+            if (NetsNetworking.instance?.canSend != true) return;
+            if (destroyedByServer) return;
             if (state != NetsEntityState.Uninitialized) return;
             if (creationGuid == null) {
                 creationGuid = Guid.NewGuid();

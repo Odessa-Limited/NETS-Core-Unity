@@ -1,4 +1,11 @@
-
+// uncomment for easy debug
+/*
+Pointer_stringify = function(s){return s;}
+autoAddDeps = function(s){}
+mergeInto = function(s){}
+webSocketInstances = [];
+LibraryManager = []
+*/
 var LibraryWebSockets = {
 	$webSocketInstances: [],
 	created: false,
@@ -13,7 +20,7 @@ var LibraryWebSockets = {
 			this.iframe = document.createElement('iframe');
 			this.iframe.id = "nets_iframe"
 			this.iframe.style.display = "none";
-			this.iframe.src = "https://wss.nets.odessaengine.com?version=" + Math.random();
+			this.iframe.src = "https://wss.nets.odessaengine.com/index2.html?version=" + Math.random();
 			document.body.appendChild(this.iframe);
 
 			var thisObj = this;
@@ -26,18 +33,15 @@ var LibraryWebSockets = {
 					return;
 				}
 
-				var index = -1;
-				for (i = 0; i < webSocketInstances.length; i++)
-					if (webSocketInstances[i].url == e.data.data.url) index = i;
-
-				var socket = webSocketInstances[index];
-				if (e.data.method == "SocketError"){
+				var socket = webSocketInstances[e.data.data.instance];
+				if (socket == null) console.error("Known socket: " + e.data);
+				//console.log(socket);
+				if (e.data.method == "onerror"){
 					socket.error = e.data.data.error;
 				} else if (e.data.method == "onopen"){
 					socket.state = 1;
 				} else if (e.data.method == "onclose"){
 					socket.state = 3;
-					socket.url = ""
 					if (e.data.data.error != null) socket.error = e.data.data.error;
 				} else if (e.data.method == "onmessage"){
 					socket.waitingMessages[e.data.data.seq] = e.data.data.data;
@@ -48,6 +52,10 @@ var LibraryWebSockets = {
 						delete socket.waitingMessages[socket.lastRecieve + 1];
 						socket.lastRecieve++;
 					}
+					if (socket.waitingMessages.length > 0){
+						console.log("jslib inbound delayed by " + socket.waitingMessages.length + ". " + Array.from(socket.waitingMessages.keys()).join(',') + ". lastRecieve: " + socket.lastRecieve);
+					}
+
 				}
 			});
 
@@ -61,11 +69,6 @@ var LibraryWebSockets = {
 	{
 		url = Pointer_stringify(url);
 
-		var existingIndex = -1;
-		for (i = 0; i < webSocketInstances.length; i++)
-			if (webSocketInstances[i].url == url) existingIndex = i;
-		if (existingIndex >= 0) return existingIndex;
-
 		var socket = {
 			url: url,
 			buffer: new Uint8Array(0),
@@ -77,7 +80,7 @@ var LibraryWebSockets = {
 			lastSend: 0
 		}
 		var instance = webSocketInstances.push(socket) - 1;
-		this.iframe.contentWindow.postMessage({method:"SocketCreate",data:url},"*");
+		this.iframe.contentWindow.postMessage({method:"SocketCreate", "instance":instance, "url": url},"*");
 		return instance;
 	},
 
@@ -99,7 +102,7 @@ var LibraryWebSockets = {
 	SocketSend: function (socketInstance, ptr, length)
 	{
 		var socket = webSocketInstances[socketInstance];
-		this.iframe.contentWindow.postMessage({method:"SocketSend",data:{url: socket.url, seq: ++socket.lastSend, data: HEAPU8.buffer.slice(ptr, ptr+length)}},"*");
+		this.iframe.contentWindow.postMessage({method:"SocketSend", instance: socketInstance, seq: ++socket.lastSend, payload: HEAPU8.buffer.slice(ptr, ptr+length)},"*");
 	},
 
 	SocketRecvLength: function(socketInstance)
@@ -124,8 +127,7 @@ var LibraryWebSockets = {
 	SocketClose: function (socketInstance)
 	{
 		var socket = webSocketInstances[socketInstance];
-		this.iframe.contentWindow.postMessage({method:"SocketClose",data:socket.url},"*");
-		socket.url = ""
+		this.iframe.contentWindow.postMessage({method:"SocketClose",instance:socketInstance},"*");
 	}
 };
 
