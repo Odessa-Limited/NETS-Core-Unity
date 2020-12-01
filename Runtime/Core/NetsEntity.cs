@@ -50,7 +50,7 @@ namespace OdessaEngine.NETS.Core {
                 nameof(Rigidbody2D.velocity),
                 nameof(Rigidbody2D.angularVelocity),
                 nameof(Rigidbody2D.mass),
-                nameof(Rigidbody2D.drag),
+                //nameof(Rigidbody2D.drag), // linearDrag in webGL :C
                 nameof(Rigidbody2D.angularDrag)
             }.Contains(p.Name))
 

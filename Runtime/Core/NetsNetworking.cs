@@ -11,12 +11,6 @@ using Odessa.Core;
 using Odessa.Nets.Core.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.UnityConverters.Math;
-using Newtonsoft.Json.UnityConverters.AI.NavMesh;
-using Newtonsoft.Json.UnityConverters.Geometry;
-using Newtonsoft.Json.UnityConverters.Hashing;
-using Newtonsoft.Json.UnityConverters.Physics;
-using Newtonsoft.Json.UnityConverters.Physics2D;
-using Newtonsoft.Json.UnityConverters.Scripting;
 using static OdessaEngine.NETS.Core.NetsEntity;
 
 #if UNITY_EDITOR
@@ -55,30 +49,14 @@ namespace OdessaEngine.NETS.Core {
                     new Vector3Converter(),
                     new Vector3IntConverter(),
                     new Vector4Converter(),
-                    new NavMeshQueryFilterConverter(),
-                    new NavMeshTriangulationConverter(),
-                    new BoundsConverter(),
-                    new BoundsIntConverter(),
-                    new PlaneConverter(),
-                    new RectConverter(),
-                    new RectIntConverter(),
-                    new RectOffsetConverter(),
-                    new Hash128Converter(),
                     new ColorConverter(),
                     new Color32Converter(),
                     new QuaternionConverter(),
-                    new SphericalHarmonicsL2Converter(),
                     new Vector2Converter(),
                     new Vector2IntConverter(),
                     new Vector3Converter(),
                     new Vector3IntConverter(),
                     new Vector4Converter(),
-                    new JointDriveConverter(),
-                    new JointLimitsConverter(),
-                    new SoftJointLimitConverter(),
-                    new ContactFilter2DConverter(),
-                    new LayerMaskConverter(),
-                    new RangeIntConverter(),
                 }
             };
         }
