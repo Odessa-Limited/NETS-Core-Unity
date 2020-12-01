@@ -316,7 +316,7 @@ namespace OdessaEngine.NETS.Core {
                                 FieldName = p.Name,
                                 //PathName = "." + obj.Transform + "." + comp.GetType().Name + "." + p.Name,
                                 Enabled = true,
-                                LerpType = LerpType.Velocity,
+                                LerpType = p.Name.ToLowerInvariant().Contains("angles") ? LerpType.SphericalLinear : LerpType.Velocity,
                             };
                             componentToSync.Fields.Add(propToSync);
                         }
