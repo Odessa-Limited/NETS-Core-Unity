@@ -336,7 +336,7 @@ namespace OdessaEngine.NETS.Core {
                             componentToSync.Fields.Add(propToSync);
                         }
                         propToSync.FieldType = p.PropertyType.Name;
-                        propToSync.PathName = "." + obj.Transform.name + "." + comp.GetType().Name + "." + p.Name;
+                        propToSync.PathName = "." +  (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name;
                     }
                     componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
                 }
