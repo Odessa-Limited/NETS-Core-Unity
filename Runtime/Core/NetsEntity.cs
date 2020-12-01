@@ -35,12 +35,25 @@ namespace OdessaEngine.NETS.Core {
         NetsEntityState state;
         public bool destroyedByServer = false;
 
-        private static PropertyInfo[] GetValidPropertiesFor(Type t) => t
+        private static PropertyInfo[] GetValidPropertiesFor(Type t, bool isTopLevel) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Where(p => p.GetAccessors().Length == 2)
             .Where(p => !p.GetGetMethod().IsStatic)
-            .Where(p => t != typeof(Transform) || new string[] { "localPosition", "eulerAngles", "localScale" }.Contains(p.Name))
-            .Where(p => t != typeof(Rigidbody2D) || new string[] { "velocity", "angularVelocity", "mass", "linearDrag", "angularDrag" }.Contains(p.Name))
+
+            .Where(p => t != typeof(Transform) || new string[] {
+                isTopLevel ? nameof(Transform.position) : nameof(Transform.localPosition),
+                nameof(Transform.eulerAngles), 
+                nameof(Transform.localScale)
+            }.Contains(p.Name))
+
+            .Where(p => t != typeof(Rigidbody2D) || new string[] {
+                nameof(Rigidbody2D.velocity),
+                nameof(Rigidbody2D.angularVelocity),
+                nameof(Rigidbody2D.mass),
+                nameof(Rigidbody2D.drag),
+                nameof(Rigidbody2D.angularDrag)
+            }.Contains(p.Name))
+
             .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
             .ToArray();
 
@@ -95,7 +108,7 @@ namespace OdessaEngine.NETS.Core {
             Id = e.Id;
             this.roomGuid = roomGuid;
             NetsEntityByRoomAndIdMap[roomGuid.ToString() + Id] = this;
-            var shouldSetFields = state == NetsEntityState.Uninitialized;
+            var shouldSetFields = OwnedByMe == false;
             if (shouldSetFields)
                 e.Fields.ToList().ForEach(kv => OnFieldChange(e, kv.Key, true));
             else {
@@ -121,6 +134,7 @@ namespace OdessaEngine.NETS.Core {
         public bool OwnedByMe => (state != NetsEntityState.Insync && Authority == AuthorityEnum.Client) ||
             (Authority.IsServerOwned() && NetsNetworking.instance?.IsServer == true) ||
             (NetsNetworking.myAccountGuid != null && NetsNetworking.myAccountGuid == networkModel?.Owner);
+
         /// <summary>
         /// Use to check if the local account was the creator of this entity
         /// </summary>
@@ -148,7 +162,7 @@ namespace OdessaEngine.NETS.Core {
                             if (f.PathName == path) {
                                 var component = t.Transform.GetComponents<Component>().SingleOrDefault(com => com.GetType().Name == c.ClassName);
                                 if (component == null) throw new Exception("unknown component for path " + path);
-                                var method = GetValidPropertiesFor(component.GetType()).SingleOrDefault(prop => prop.Name == f.FieldName);
+                                var method = GetValidPropertiesFor(component.GetType(), t.IsSelf).SingleOrDefault(prop => prop.Name == f.FieldName);
                                 if (method == null) throw new Exception("unknown method for path " + path);
                                 var objProp = new ObjectProperty {
                                     Object = component,
@@ -159,7 +173,7 @@ namespace OdessaEngine.NETS.Core {
                                 return objProp;
                             }
                         } catch (Exception e) {
-                            Debug.LogError("Unable to get property at path " + path + ". Error: " + e.Message);
+                            Debug.LogError("Unable to get property at path " + path + ". Error: " + e);
                         }
                     }
                 }
@@ -292,7 +306,7 @@ namespace OdessaEngine.NETS.Core {
                 });
 
             foreach (var obj in ObjectsToSync) {
-                obj.IsSelf = false;//obj.Transform == transform;
+                obj.IsSelf = obj.Transform == transform;
                 var components = obj.Transform.GetComponents<Component>();
 
                 foreach (var comp in components) {
@@ -308,7 +322,8 @@ namespace OdessaEngine.NETS.Core {
                     }
 
                     var componentFields = new List<ScriptFieldToSync>();
-                    var props = GetValidPropertiesFor(comp.GetType());
+                    var props = GetValidPropertiesFor(comp.GetType(), obj.IsSelf);
+
                     foreach (var p in props) {
                         var propToSync = componentToSync.Fields.FirstOrDefault(f => f.FieldName == p.Name);
                         if (propToSync == null) {
