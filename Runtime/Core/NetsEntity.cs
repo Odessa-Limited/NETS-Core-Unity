@@ -42,7 +42,7 @@ namespace OdessaEngine.NETS.Core {
 
             .Where(p => t != typeof(Transform) || new string[] {
                 isTopLevel ? nameof(Transform.position) : nameof(Transform.localPosition),
-                nameof(Transform.eulerAngles), 
+                isTopLevel ? nameof(Transform.eulerAngles) : nameof(Transform.localEulerAngles), 
                 nameof(Transform.localScale)
             }.Contains(p.Name))
 
