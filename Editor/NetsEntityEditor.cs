@@ -18,12 +18,6 @@ namespace OdessaEngine.NETS.Core {
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.Authority)));
             var objectsToSync = serializedObject.FindProperty(nameof(NetsEntity.ObjectsToSync));
 
-            for (int i = 0; i < objectsToSync.arraySize; i++) {
-                var objectToSync = objectsToSync.GetArrayElementAtIndex(i);
-                if (objectToSync.FindPropertyRelative(nameof(ObjectToSync.IsSelf)).boolValue == false) continue;
-                RenderObjectProperties(objectToSync);
-            }
-
             //GUI.backgroundColor = new Color32(47, 163, 220, 255); // Odessa color
             Texture2D texture = new Texture2D(1, 1);
             texture.SetPixel(0, 0, new Color32(0, 0, 0, 40));
@@ -40,7 +34,6 @@ namespace OdessaEngine.NETS.Core {
                 for (int i = 0; i < objectsToSync.arraySize; i++) {
                     var objectToSync = objectsToSync.GetArrayElementAtIndex(i);
                     var transform = objectToSync.FindPropertyRelative(nameof(ObjectToSync.Transform));
-                    if (objectToSync.FindPropertyRelative(nameof(ObjectToSync.IsSelf)).boolValue == true) continue;
 
                     var path = transform.propertyPath;
                     if (folded.ContainsKey(path) == false) folded[path] = true;
