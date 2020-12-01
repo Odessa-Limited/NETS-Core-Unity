@@ -56,6 +56,11 @@ namespace OdessaEngine.NETS.Core {
 
             .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
             .ToArray();
+        private static PropertyInfo[] GetAllPropertiesFor(Type t) => t
+           .GetProperties()
+           .Where(p => p.GetAccessors().Length == 2)
+           .Where(p => !p.GetGetMethod().IsStatic)
+           .ToArray();
 
         public enum NetsEntityState {
             Uninitialized,
@@ -173,6 +178,11 @@ namespace OdessaEngine.NETS.Core {
                                 return objProp;
                             }
                         } catch (Exception e) {
+                            if (f.PathName == path) {
+                                var component = t.Transform.GetComponents<Component>().SingleOrDefault(com => com.GetType().Name == c.ClassName);
+                                var methods = GetAllPropertiesFor(component.GetType());
+                                Debug.LogError($"All available properties {string.Join(", ", new List<PropertyInfo>(methods))}");
+                            }
                             Debug.LogError("Unable to get property at path " + path + ". Error: " + e);
                         }
                     }
