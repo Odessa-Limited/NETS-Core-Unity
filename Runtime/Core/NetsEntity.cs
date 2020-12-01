@@ -300,7 +300,7 @@ namespace OdessaEngine.NETS.Core {
 
             // Fill in Objects to sync
             if (ObjectsToSync.Any(o => o.Transform == transform) == false)
-                ObjectsToSync.Add(new ObjectToSync {
+                ObjectsToSync.Insert(0, new ObjectToSync {
                     Transform = transform,
                     Components = new List<ComponentsToSync>(),
                 });
