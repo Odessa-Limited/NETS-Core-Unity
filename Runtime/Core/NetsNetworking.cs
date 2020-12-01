@@ -42,6 +42,8 @@ namespace OdessaEngine.NETS.Core {
         public string DebugRoomGuid = "00000000000000000000000000000000";
         bool debugConnections = true;
 
+        string url { get { return UseLocal ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_URL; } }
+
 
 
         static NetsNetworking() {
@@ -557,7 +559,7 @@ namespace OdessaEngine.NETS.Core {
         /// </code>
         /// 
         public static void CreateOrJoinRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
-            instance.InternalCreateOrJoinRoom(RoomName, CallBack, NoPlayerTTL);
+            instance.InternalJoinOrCreateRoom(RoomName, CallBack, NoPlayerTTL);
         }
 
         /// <summary>
@@ -647,7 +649,7 @@ namespace OdessaEngine.NETS.Core {
         }
         //Internal
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
-            var webRequest = UnityWebRequest.Get($"{NetsNetworkingConsts.NETS_URL}/createRoom?token={applicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
+            var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={applicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -666,7 +668,7 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
         protected void InternalJoinRoom(string RoomName, Action<RoomState> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{NetsNetworkingConsts.NETS_URL}/joinRoom?token={applicationGuid}&roomName={RoomName}");
+            var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={applicationGuid}&roomName={RoomName}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -695,7 +697,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinAnyRoom() {
         }
         protected void InternalGetAllRooms(Action<List<RoomState>> CallBack) {
-            var webRequest = UnityWebRequest.Get($"{NetsNetworkingConsts.NETS_URL}/listRooms?token={applicationGuid}");
+            var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={applicationGuid}");
             StartCoroutine( SendOnWebRequestComplete( webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -713,8 +715,7 @@ namespace OdessaEngine.NETS.Core {
                 GetAllRoomsResponse?.Invoke(roomStates);
             }));
         }
-        protected void InternalCreateOrJoinRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
-            string url = UseLocal ? "127.0.0.1:8001": NetsNetworkingConsts.NETS_URL;
+        protected void InternalJoinOrCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/joinOrCreateRoom?token={applicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
