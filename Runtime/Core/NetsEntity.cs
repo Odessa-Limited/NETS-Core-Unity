@@ -56,11 +56,9 @@ namespace OdessaEngine.NETS.Core {
 
             .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
             .ToArray();
-        private static PropertyInfo[] GetAllPropertiesFor(Type t) => t
+        private static List<string> GetAllPropertiesFor(Type t) => t
            .GetProperties()
-           .Where(p => p.GetAccessors().Length == 2)
-           .Where(p => !p.GetGetMethod().IsStatic)
-           .ToArray();
+            .Select(o => $"Name {t.Name}: {string.Join(", ",o.GetAccessors().Select(p => p.Name))} . {string.Join(", " , o.GetMethod.Name + ".")}").ToList();
 
         public enum NetsEntityState {
             Uninitialized,
