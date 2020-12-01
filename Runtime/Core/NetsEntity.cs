@@ -179,7 +179,7 @@ namespace OdessaEngine.NETS.Core {
                             if (f.PathName == path) {
                                 var component = t.Transform.GetComponents<Component>().SingleOrDefault(com => com.GetType().Name == c.ClassName);
                                 var methods = GetAllPropertiesFor(component.GetType());
-                                Debug.LogError($"All available properties {string.Join(", ", new List<PropertyInfo>(methods))}");
+                                Debug.LogError($"All available properties {string.Join(", ", methods)}");
                             }
                             Debug.LogError("Unable to get property at path " + path + ". Error: " + e);
                         }
