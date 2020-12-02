@@ -42,7 +42,7 @@ namespace OdessaEngine.NETS.Core {
 
             .Where(p => t != typeof(Transform) || new string[] {
                 isTopLevel ? nameof(Transform.position) : nameof(Transform.localPosition),
-                isTopLevel ? nameof(Transform.eulerAngles) : nameof(Transform.localEulerAngles), 
+                isTopLevel ? nameof(Transform.rotation) : nameof(Transform.localRotation), 
                 nameof(Transform.localScale)
             }.Contains(p.Name))
 
@@ -54,12 +54,8 @@ namespace OdessaEngine.NETS.Core {
                 nameof(Rigidbody2D.angularDrag)
             }.Contains(p.Name))
 
-            .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3) }.Contains(p.PropertyType))
+            .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(p.PropertyType))
             .ToArray();
-        private static List<string> GetAllPropertiesFor(Type t) => t
-           .GetProperties()
-            .Select(o => $"Name {t.Name}: {string.Join(", ",o.GetAccessors().Select(p => p.Name))} . {string.Join(", " , o.GetMethod.Name + ".")}").ToList();
-
         public enum NetsEntityState {
             Uninitialized,
             Pending,
@@ -176,11 +172,6 @@ namespace OdessaEngine.NETS.Core {
                                 return objProp;
                             }
                         } catch (Exception e) {
-                            if (f.PathName == path) {
-                                var component = t.Transform.GetComponents<Component>().SingleOrDefault(com => com.GetType().Name == c.ClassName);
-                                var methods = GetAllPropertiesFor(component.GetType());
-                                Debug.LogError($"All available properties {string.Join(", ", methods)}");
-                            }
                             Debug.LogError("Unable to get property at path " + path + ". Error: " + e);
                         }
                     }
@@ -208,6 +199,7 @@ namespace OdessaEngine.NETS.Core {
                             var objectToSave = objProp.Value();
                             if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
                             if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
+                            if (objectToSave is Quaternion v4) objectToSave = new System.Numerics.Vector4(v4.x, v4.y, v4.z,v4.w);
                             localModel.SetObject(f.PathName, objectToSave);
                         }
 
@@ -234,6 +226,7 @@ namespace OdessaEngine.NETS.Core {
                     var obj = entity.GetObject(key);
                     if (obj is System.Numerics.Vector2 v2) obj = v2.ToUnityVector2();
                     if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
+                    if (obj is System.Numerics.Vector4 v4) obj = v4.ToUnityQuaternion();
 
                     // Check lerps
                     if (objProp.Field.FieldType == "Vector3" && objProp.Field.LerpType != LerpType.None) {
