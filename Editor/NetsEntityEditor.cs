@@ -101,7 +101,7 @@ namespace OdessaEngine.NETS.Core {
                     EditorGUILayout.PropertyField(enabled, new GUIContent(fieldName.stringValue));
                     if (enabled.boolValue) {
                         var fieldType = field.FindPropertyRelative(nameof(ScriptFieldToSync.FieldType));
-                        if (new[] { "Vector3", /*"Vector2", "Single"*/ }.Contains(fieldType.stringValue)) {
+                        if (new[] {"Quaternion", "Vector3", /*"Vector2", "Single"*/ }.Contains(fieldType.stringValue)) {
                             var lerpType = field.FindPropertyRelative(nameof(ScriptFieldToSync.LerpType));
                             EditorGUILayout.PropertyField(lerpType, new GUIContent("Lerp Type"));
                         }

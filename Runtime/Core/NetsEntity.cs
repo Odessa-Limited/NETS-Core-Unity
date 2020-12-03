@@ -157,7 +157,8 @@ namespace OdessaEngine.NETS.Core {
         }
 
 		public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
-        public Dictionary<string, Vector3LerpingObjectProperty> pathToLerp = new Dictionary<string, Vector3LerpingObjectProperty>();
+        public Dictionary<string, Vector3LerpingObjectProperty> pathToLerpVector3 = new Dictionary<string, Vector3LerpingObjectProperty>();
+        public Dictionary<string, QuaternionLerpingObjectProperty> pathToLerpQuaternion = new Dictionary<string, QuaternionLerpingObjectProperty>();
         HashSet<string> loggedUnknownPaths = new HashSet<string>();
         public ObjectProperty GetPropertyAtPath(string path) {
             if (pathToProperty.TryGetValue(path, out var r)) return r;
@@ -241,19 +242,34 @@ namespace OdessaEngine.NETS.Core {
                     if (obj is System.Numerics.Vector4 v4) obj = v4.ToUnityQuaternion();
 
                     // Check lerps
-                    if (objProp.Field.FieldType == "Vector3" && objProp.Field.LerpType != LerpType.None) {
-                        if (!pathToLerp.TryGetValue(key, out var lerpObj)) {
-                            lerpObj = pathToLerp[key] = new Vector3LerpingObjectProperty {
-                                Field = objProp.Field,
-                                Object = objProp.Object,
-                                Method = objProp.Method,
-                                Lerp = new Vector3AdaptiveLerp(),
-                            };
-                            lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
-                            lerpObj.Lerp.type = objProp.Field.LerpType;
+                    if (objProp.Field.LerpType != LerpType.None) {
+                        if (objProp.Field.FieldType == "Vector3") {
+                            if (!pathToLerpVector3.TryGetValue(key, out var lerpObj)) {
+                                lerpObj = pathToLerpVector3[key] = new Vector3LerpingObjectProperty {
+                                    Field = objProp.Field,
+                                    Object = objProp.Object,
+                                    Method = objProp.Method,
+                                    Lerp = new Vector3AdaptiveLerp(),
+                                };
+                                lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
+                                lerpObj.Lerp.type = objProp.Field.LerpType;
+                            }
+                            lerpObj.Lerp.ValueChanged((Vector3)obj);
+                            return;
+                        } else if (objProp.Field.FieldType == "Quaternion") {
+                            if (!pathToLerpQuaternion.TryGetValue(key, out var lerpObj)) {
+                                lerpObj = pathToLerpQuaternion[key] = new QuaternionLerpingObjectProperty {
+                                    Field = objProp.Field,
+                                    Object = objProp.Object,
+                                    Method = objProp.Method,
+                                    Lerp = new QuaternionAdaptiveLerp(),
+                                };
+                                lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
+                                lerpObj.Lerp.type = objProp.Field.LerpType;
+                            }
+                            lerpObj.Lerp.ValueChanged((Quaternion)obj);
+                            return;
                         }
-                        lerpObj.Lerp.ValueChanged((Vector3)obj);
-                        return;
                     }
 
                     // Else set property directly
@@ -282,7 +298,10 @@ namespace OdessaEngine.NETS.Core {
                 if (!OwnedByMe && state == NetsEntityState.Insync) {
                     // Run through lerps
                     //if (SyncPosition) GetPositionTransform().position = positionLerp.GetLerped();
-                    foreach (var lo in pathToLerp.Values) {
+                    foreach (var lo in pathToLerpVector3.Values) {
+                        lo.SetValue(lo.Lerp.GetLerped());
+                    }
+                    foreach (var lo in pathToLerpQuaternion.Values) {
                         lo.SetValue(lo.Lerp.GetLerped());
                     }
                 } else {
@@ -356,7 +375,7 @@ namespace OdessaEngine.NETS.Core {
                                 FieldName = p.Name,
                                 //PathName = "." + obj.Transform + "." + comp.GetType().Name + "." + p.Name,
                                 Enabled = true,
-                                LerpType = p.Name.ToLowerInvariant().Contains("angles") ? LerpType.SphericalLinear : LerpType.Velocity,
+                                LerpType = LerpType.Velocity,
                             };
                             componentToSync.Fields.Add(propToSync);
                         }
@@ -478,5 +497,8 @@ namespace OdessaEngine.NETS.Core {
 
     public class Vector3LerpingObjectProperty : ObjectProperty {
         public Vector3AdaptiveLerp Lerp { get; set; }
+    }
+    public class QuaternionLerpingObjectProperty : ObjectProperty {
+        public QuaternionAdaptiveLerp Lerp { get; set; }
     }
 }

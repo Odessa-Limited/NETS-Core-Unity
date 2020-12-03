@@ -6,7 +6,6 @@ namespace OdessaEngine.NETS.Core {
 		Velocity,
 		Smooth,
 		Linear,
-		SphericalLinear,
 	}
 
 	public abstract class AdaptiveLerp<T> {
@@ -34,7 +33,6 @@ namespace OdessaEngine.NETS.Core {
 		protected abstract T LinearLerp(T a, T b, float value);
 		protected abstract T SoftLerp(T a, T b, float value);
 		protected abstract T Bezier2(T a, T b, T c, float value);
-		protected abstract T SphericalLinearLerp(T a, T b, float value);
 
 		private void SetLastObject(T o) {
 			previousValueAfterVelocity = LinearLerp(LinearLerp(previousValue, currentValue, velocityExterpolationAmount), o, velocityCorrectionAmount);
@@ -86,8 +84,6 @@ namespace OdessaEngine.NETS.Core {
 				lastReturnedValue = SoftLerp(previousValue, currentValue, percent);
 			else if (type == LerpType.Linear)
 				lastReturnedValue = LinearLerp(previousValue, currentValue, percent * 0.9f);
-			else if (type == LerpType.SphericalLinear)
-				lastReturnedValue = SphericalLinearLerp(previousValue, currentValue, percent * 0.9f);
 			else if (type == LerpType.Velocity)
 				lastReturnedValue = Bezier2(previousValue, previousValueAfterVelocity, currentValue, percent);
 			return lastReturnedValue;
@@ -107,12 +103,30 @@ namespace OdessaEngine.NETS.Core {
 		);
 
 		protected override Vector3 Bezier2(Vector3 s, Vector3 p, Vector3 e, float t) {
+			t = Mathf.Clamp(t, 0, 1);
 			float rt = 1 - t;
 			return rt * rt * s + 2 * rt * t * p + t * t * e;
 		}
 
-		protected override Vector3 SphericalLinearLerp(Vector3 a, Vector3 b, float value) => Quaternion.Slerp(Quaternion.Euler(a), Quaternion.Euler(b), value).eulerAngles;
-
 		protected override Vector3 Default() => Vector3.zero;
+	}
+	public class QuaternionAdaptiveLerp : AdaptiveLerp<Quaternion> {
+		protected override float Distance(Quaternion a, Quaternion b) => Quaternion.Angle(a,b);
+
+		protected override Quaternion LinearLerp(Quaternion a, Quaternion b, float value) => Quaternion.Slerp(a, b, value);
+
+		protected override Quaternion SoftLerp(Quaternion a, Quaternion b, float value) => new Quaternion(
+			Mathf.SmoothStep(a.x, b.x, value),
+			Mathf.SmoothStep(a.y, b.y, value),
+			Mathf.SmoothStep(a.z, b.z, value),
+			Mathf.SmoothStep(a.w, b.w, value)
+		);
+
+		protected override Quaternion Bezier2(Quaternion s, Quaternion p, Quaternion e, float t) {
+			t = Mathf.Clamp(t, 0, 1);
+			return Quaternion.Slerp(Quaternion.Slerp(s, p, 2 * t * (1 - t)), e, t * t);
+		}
+
+		protected override Quaternion Default() => Quaternion.identity;
 	}
 }
