@@ -41,8 +41,8 @@ namespace OdessaEngine.NETS.Core {
             .Where(p => !p.GetGetMethod().IsStatic)
 
             .Where(p => t != typeof(Transform) || new string[] {
-                isTopLevel ? nameof(Transform.position) : nameof(Transform.localPosition),
-                isTopLevel ? nameof(Transform.rotation) : nameof(Transform.localRotation), 
+                nameof(Transform.position),
+                nameof(Transform.rotation), 
                 nameof(Transform.localScale)
             }.Contains(p.Name))
 
@@ -199,6 +199,9 @@ namespace OdessaEngine.NETS.Core {
                         foreach (var f in c.Fields) {
                             if (f.Enabled == false) continue;
                             var objProp = GetPropertyAtPath(f.PathName);
+                            if (objProp == null) {
+                                print("Unable to get property at path: " + f.PathName + " - it's null!");
+                            }
                             var objectToSave = objProp.Value();
                             if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
                             if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
@@ -309,8 +312,10 @@ namespace OdessaEngine.NETS.Core {
                     Components = new List<ComponentsToSync>(),
                 });
 
+            ObjectsToSync.ForEach(o => o.IsSelf = false);
+            ObjectsToSync[0].IsSelf = true;
+
             foreach (var obj in ObjectsToSync) {
-                obj.IsSelf = obj.Transform == transform;
                 var components = obj.Transform.GetComponents<Component>();
 
                 foreach (var comp in components) {
