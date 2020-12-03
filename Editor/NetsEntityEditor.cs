@@ -105,7 +105,7 @@ namespace OdessaEngine.NETS.Core {
                             var lerpType = field.FindPropertyRelative(nameof(ScriptFieldToSync.LerpType));
                             EditorGUILayout.PropertyField(lerpType, new GUIContent("Lerp Type"));
                         }
-                        EditorGUILayout.LabelField(pathName.stringValue);
+                        //EditorGUILayout.LabelField(pathName.stringValue);
                     }
 
 
