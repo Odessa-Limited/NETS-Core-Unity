@@ -56,7 +56,6 @@ namespace OdessaEngine.NETS.Core {
                     new Vector2IntConverter(),
                     new Vector3Converter(),
                     new Vector3IntConverter(),
-                    new Vector4Converter(),
                 }
             };
         }

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Experimental.SceneManagement;
 using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
@@ -13,6 +14,12 @@ namespace OdessaEngine.NETS.Core {
 
         public override void OnInspectorGUI() {
             serializedObject.Update();
+
+            if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                EditorGUILayout.LabelField("Please modify the prefab to modify it's networking logic.");
+                serializedObject.ApplyModifiedProperties();
+                return;
+            }
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.SyncFramesPerSecond)));
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.Authority)));
@@ -90,6 +97,7 @@ namespace OdessaEngine.NETS.Core {
                     var field = fields.GetArrayElementAtIndex(i);
                     var enabled = field.FindPropertyRelative(nameof(ScriptFieldToSync.Enabled));
                     var fieldName = field.FindPropertyRelative(nameof(ScriptFieldToSync.FieldName));
+                    var pathName = field.FindPropertyRelative(nameof(ScriptFieldToSync.PathName));
                     EditorGUILayout.PropertyField(enabled, new GUIContent(fieldName.stringValue));
                     if (enabled.boolValue) {
                         var fieldType = field.FindPropertyRelative(nameof(ScriptFieldToSync.FieldType));
@@ -97,6 +105,7 @@ namespace OdessaEngine.NETS.Core {
                             var lerpType = field.FindPropertyRelative(nameof(ScriptFieldToSync.LerpType));
                             EditorGUILayout.PropertyField(lerpType, new GUIContent("Lerp Type"));
                         }
+                        EditorGUILayout.LabelField(pathName.stringValue);
                     }
 
 

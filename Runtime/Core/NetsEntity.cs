@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 #if UNITY_EDITOR
+using UnityEditor.Experimental.SceneManagement;
 using UnityEditor;
 #endif
 
@@ -41,8 +42,8 @@ namespace OdessaEngine.NETS.Core {
             .Where(p => !p.GetGetMethod().IsStatic)
 
             .Where(p => t != typeof(Transform) || new string[] {
-                nameof(Transform.position),
-                nameof(Transform.rotation), 
+                isTopLevel ? nameof(Transform.position) : nameof(Transform.localPosition),
+                isTopLevel ? nameof(Transform.rotation) : nameof(Transform.localRotation),
                 nameof(Transform.localScale)
             }.Contains(p.Name))
 
@@ -288,22 +289,32 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
             if (Application.isPlaying) return;
 
-            var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            this.prefab = prefab?.name;
-            if (prefab == null)
-                Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
-            else {
-                var component = prefab.GetComponent<NetsEntity>();
-                if (component == null) {
-                    component = prefab.AddComponent<NetsEntity>();
-                    var go = gameObject;
-                    DestroyImmediate(this);
-                    Selection.activeObject = prefab;
+            if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                if (prefab == null && PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                    Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 }
-                component.prefab = prefab.name;
+                return;
             }
+
+            if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                return;
+            }
+
+            prefab = transform.name;
+            /*
+            // First time script/prefab init
+            var component = prefab.GetComponent<NetsEntity>();
+            if (component == null) {
+                component = prefab.AddComponent<NetsEntity>();
+                var go = gameObject;
+                DestroyImmediate(this);
+                Selection.activeObject = prefab;
+            }
+            component.prefab = prefab.name;
+            */
+
 
             // Fill in Objects to sync
             if (ObjectsToSync.Any(o => o.Transform == transform) == false)
