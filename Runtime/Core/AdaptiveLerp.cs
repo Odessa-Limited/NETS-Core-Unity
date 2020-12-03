@@ -103,7 +103,6 @@ namespace OdessaEngine.NETS.Core {
 		);
 
 		protected override Vector3 Bezier2(Vector3 s, Vector3 p, Vector3 e, float t) {
-			t = Mathf.Clamp(t, 0, 1);
 			float rt = 1 - t;
 			return rt * rt * s + 2 * rt * t * p + t * t * e;
 		}
@@ -123,7 +122,6 @@ namespace OdessaEngine.NETS.Core {
 		);
 
 		protected override Quaternion Bezier2(Quaternion s, Quaternion p, Quaternion e, float t) {
-			t = Mathf.Clamp(t, 0, 1);
 			return Quaternion.Slerp(Quaternion.Slerp(s, p, 2 * t * (1 - t)), e, t * t);
 		}
 
