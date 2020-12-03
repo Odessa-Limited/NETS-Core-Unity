@@ -152,6 +152,7 @@ namespace OdessaEngine.NETS.Core {
 
         public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
         public Dictionary<string, Vector3LerpingObjectProperty> pathToLerp = new Dictionary<string, Vector3LerpingObjectProperty>();
+        HashSet<string> loggedUnknownPaths = new HashSet<string>();
         public ObjectProperty GetPropertyAtPath(string path) {
             if (pathToProperty.TryGetValue(path, out var r)) return r;
             foreach (var t in ObjectsToSync) {
@@ -172,7 +173,9 @@ namespace OdessaEngine.NETS.Core {
                                 return objProp;
                             }
                         } catch (Exception e) {
+                            if (loggedUnknownPaths.Contains(f.PathName)) return null;
                             Debug.LogError("Unable to get property at path " + path + ". Error: " + e);
+                            loggedUnknownPaths.Add(f.PathName);
                         }
                     }
                 }
