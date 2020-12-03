@@ -26,6 +26,8 @@ namespace OdessaEngine.NETS.Core {
         public static Action<List<RoomState>> GetAllRoomsResponse;
         public static Action<RoomState> CreateRoomResponse;
 
+        public static Action<int> PlayerCount;
+
         public static string applicationGuid = "0123456789abcdef0123456789abcdef";
         public bool UseLocal = false;
         [Range(0, 500)]
@@ -266,7 +268,7 @@ namespace OdessaEngine.NETS.Core {
                         //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                         if (entity.Id == 1) {
                             if (entity.PrefabName == "Room") {
-                                print("PlayerCount: " + entity.GetInt("PlayerCount"));
+                                PlayerCount?.Invoke(entity.GetInt("PlayerCount"));
                                 print("ServerAccount: " + entity.GetString("ServerAccount"));
                                 if (entity.GetString("ServerAccount")?.Length == 32) {
                                     IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
