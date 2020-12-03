@@ -145,13 +145,18 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
             if (Application.isPlaying == false) return;
 #endif
+
             if (OwnedByMe == false && destroyedByServer == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
             if (destroyedByServer == false) {
                 NetsNetworking.instance?.DestroyEntity(Id);
             }
         }
 
-        public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
+		public void OnApplicationQuit() {
+            destroyedByServer = true;
+        }
+
+		public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
         public Dictionary<string, Vector3LerpingObjectProperty> pathToLerp = new Dictionary<string, Vector3LerpingObjectProperty>();
         HashSet<string> loggedUnknownPaths = new HashSet<string>();
         public ObjectProperty GetPropertyAtPath(string path) {
