@@ -348,7 +348,8 @@ namespace OdessaEngine.NETS.Core {
                 var eventString = bb.ReadString();
                 try {
                     if (entityIdToNetsEntity[roomGuid].TryGetValue(entityId, out var nets)) {
-                        nets.InterpretMethod(eventString);
+                        if(nets)
+                            nets.InterpretMethod(eventString);
                     } else {
                         Debug.LogError($"Nets Entity doesn't exist. Room {roomGuid:N}, Entity{entityId}");
                     }

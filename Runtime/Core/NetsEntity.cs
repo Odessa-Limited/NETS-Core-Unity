@@ -409,6 +409,7 @@ namespace OdessaEngine.NETS.Core {
             }
         }
         public void InterpretMethod(string MethodEvent) {
+            if (destroyedByServer) return;//Don't run on ents that are flagged as dead
             SetUpMethodDict();
             var e = JsonConvert.DeserializeObject<MethodEvent>(MethodEvent);
             if (idToMethodLookup.TryGetValue(e.methodId, out var method)) {
@@ -419,7 +420,11 @@ namespace OdessaEngine.NETS.Core {
                         return j.ToObject(p.ParameterType);
                     return Convert.ChangeType(obj, p.ParameterType);
                 }).ToList();
-                method.Invoke(GetComponent(method.DeclaringType), typedParams.ToArray());
+                Component comp = GetComponent(method.DeclaringType);
+                if (comp)
+                    method.Invoke(comp, typedParams.ToArray());
+                else
+                    Debug.Log($"Component doesn't exist {comp.name}");
             } else
                 throw new Exception($"Received RPC that we don't have a method for {e.methodId}");
         }
