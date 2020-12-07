@@ -7,6 +7,7 @@ using System;
 using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEngine.SocialPlatforms;
 
 #if UNITY_EDITOR
 using UnityEditor.Experimental.SceneManagement;
@@ -193,6 +194,7 @@ namespace OdessaEngine.NETS.Core {
         float lastUpdateTime = 0f;
         bool SetPropertiesBeforeCreation = false;
         public void LateUpdate() {
+
             if (SetPropertiesBeforeCreation == false) {
                 if (state != NetsEntityState.Insync) return;
                 if (OwnedByMe == false) return;
@@ -289,11 +291,36 @@ namespace OdessaEngine.NETS.Core {
             }
         }
 
+        bool lastOwnState = false;
+        bool ownershipSwitch = false;
         void Update() {
-
+            ownershipSwitch = lastOwnState != OwnedByMe;
+            lastOwnState = OwnedByMe;
             if (Application.isPlaying) {
                 //if (NetsNetworking.instance == null) return;
                 //if (NetsNetworking.instance.canSend == false) return;
+
+                if (ownershipSwitch) {
+                    if (OwnedByMe) {//Just switched to server
+                        if(networkModel != null)
+                            localModel = networkModel.Clone();
+                        foreach (var lo in pathToLerpVector3.Values) {
+                            lo.SetValue(lo.Lerp.GetMostRecent());
+                        }
+                        foreach (var lo in pathToLerpQuaternion.Values) {
+                            lo.SetValue(lo.Lerp.GetMostRecent());
+                        }
+                    } else {
+                        foreach (var lo in pathToLerpVector3.Values) {
+                            lo.Lerp.Reset(1 / SyncFramesPerSecond, (Vector3)lo.Value());
+                            lo.Lerp.ValueChanged((Vector3)lo.Value());
+                        }
+                        foreach (var lo in pathToLerpQuaternion.Values) {
+                            lo.Lerp.Reset(1 / SyncFramesPerSecond, (Quaternion)lo.Value());
+                            lo.Lerp.ValueChanged((Quaternion)lo.Value());
+                        }
+                    }
+                }
 
                 if (!OwnedByMe && state == NetsEntityState.Insync) {
                     // Run through lerps
@@ -386,7 +413,6 @@ namespace OdessaEngine.NETS.Core {
                 }
                 obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
             }
-
 #endif
         }
         private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();

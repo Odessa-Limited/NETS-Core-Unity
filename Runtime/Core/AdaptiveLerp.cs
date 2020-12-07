@@ -47,7 +47,7 @@ namespace OdessaEngine.NETS.Core {
 				previousValue = input;
 				lastReturnedValue = input;
 				currentValue = input;
-				lastReceiveTime = Time.time;
+				lastReceiveTime = Time.time + expectedReceiveDelay;
 				return;
 			}
 
@@ -75,6 +75,18 @@ namespace OdessaEngine.NETS.Core {
 			else expectedReceiveDelay = Mathf.Lerp(expectedReceiveDelay, timeDifference, 0.3f);
 
 			SetLastObject(input);
+		}
+		public T GetMostRecent() {
+			return currentValue;
+		}
+		public void Reset(float expectedDelay, T newValue) {
+			expectedReceiveDelay = expectedDelay;
+			previousValue = newValue;
+			currentValue = newValue;
+			lastReturnedValue = newValue;
+			previousValueAfterVelocity = newValue;
+			expectedVelocity = -1;
+			lastReceiveTime= 0;
 		}
 
 		public T GetLerped() {
