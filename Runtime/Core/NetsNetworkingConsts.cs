@@ -9,7 +9,6 @@ public static class NetsNetworkingConsts {
             return (NETS_USING_SECURE ? "https" : "http") + "://roomservice.nets.odessaengine.com" + ( NETS_USING_SECURE ? "" : ":" + NETS_ROOM_SERVICE_PORT );
         }
     }
-    public static string NETS_DEFAULT_ROOM_NAME = "default";
     public static bool NETS_USING_SECURE { 
         get {
 #if UNITY_WEBGL

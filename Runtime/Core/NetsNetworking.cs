@@ -28,19 +28,18 @@ namespace OdessaEngine.NETS.Core {
 
         public static Action<int> PlayerCount;
 
-        public static string applicationGuid = "0123456789abcdef0123456789abcdef";
-        public bool UseLocal = false;
         [Range(0, 500)]
         public float DebugLatency = 0f;
-        [Header("Developer Debug")]
-        public bool hitWorkerDirectly = false;
-        public string DebugWorkerUrlAndPort = "140.82.41.234:12334";
-        public string DebugRoomGuid = "00000000000000000000000000000000";
-        bool debugConnections = true;
+        private NETSSettings _settings;
+        private NETSSettings settings {
+            get{
+                if (!_settings)
+                    LoadOrCreateSettings();
+                return _settings;
+            } 
+        }
 
-        string url { get { return UseLocal ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_URL; } }
-
-
+        string url { get { return settings.UseLocalConnectionInUnity ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_URL; } }
 
         static NetsNetworking() {
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings
@@ -68,7 +67,6 @@ namespace OdessaEngine.NETS.Core {
 
         //public GameObject frameworkPlaceholder;
         //public bool showPlaceholderPrefabs = false;
-
 
         public bool IsServer = false;
         public static Guid? myAccountGuid;
@@ -163,13 +161,29 @@ namespace OdessaEngine.NETS.Core {
 		public void Awake() {
             if (!Application.isPlaying) return;
             DontDestroyOnLoad(gameObject);
+            LoadOrCreateSettings();
+        }
+        private bool LoadOrCreateSettings() {
+            _settings = Resources.Load("NETSSettings") as NETSSettings;
+            if(!_settings) {
+                var scriptable = ScriptableObject.CreateInstance<NETSSettings>();
+                Directory.CreateDirectory("/Assets/Resources");
+                AssetDatabase.CreateAsset(scriptable, "Assets/Resources/NETSSettings.asset");
+                EditorUtility.SetDirty(scriptable);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                _settings = Resources.Load("NETSSettings") as NETSSettings;
+            }
+            return true;
         }
 
 		// Use this for initialization
 		public IEnumerator Start() {
             if (!Application.isPlaying) yield break;
-
+            if (!_settings)
+                LoadOrCreateSettings();
             instance = this;
+
             //GameInstance.placeholderEntities = showPlaceholderPrefabs;
 
             // Get IP list and connect to them all ( try both http and https, we don't know what we are using )
@@ -178,19 +192,19 @@ namespace OdessaEngine.NETS.Core {
 
             //ips.Add("ws://127.0.0.1:" + port);
             //ips.Add("wss://" + URL + ":" + (port + 1000));
-            if (hitWorkerDirectly) {
+            if (settings.HitWorkerDirectly) {
 
-                StartCoroutine(connect($"{(DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{DebugWorkerUrlAndPort}"));
+                StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
                         bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                        bos.WriteGuid(Guid.ParseExact(DebugRoomGuid, "N"));
+                        bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
                     });
                     w.Send(sendData);
                 }));
                 yield break;
             }
-            CreateOrJoinRoom(NetsNetworkingConsts.NETS_DEFAULT_ROOM_NAME);
+            CreateOrJoinRoom(settings.DefaultRoomName);
             ips.Reverse();
         }
         
@@ -361,7 +375,7 @@ namespace OdessaEngine.NETS.Core {
 
         IEnumerator connect(string url) {
             if (connected) {
-                if (debugConnections)
+                if (settings.DebugConnections)
                     print("Already connected");
                 yield break;
             }
@@ -383,7 +397,7 @@ namespace OdessaEngine.NETS.Core {
 
             print("attempting connect");
             yield return StartCoroutine(conn.Connect());
-            if (debugConnections)
+            if (settings.DebugConnections)
                 print("Connected to game server? " + conn.isConnected);
             yield return new WaitForSeconds(.2f);
 
@@ -407,7 +421,7 @@ namespace OdessaEngine.NETS.Core {
             connected = true;
             keyPairEntityCollectors.Clear();
             entityIdToNetsEntity.Clear();
-            if (debugConnections)
+            if (settings.DebugConnections)
                 print("Debug: valid: " + valid + " , connected " + connected);
 
 
@@ -479,7 +493,12 @@ namespace OdessaEngine.NETS.Core {
 
             var allPaths = AssetDatabase.GetAllAssetPaths();
             foreach (var path in allPaths) {
-                var loaded = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                UnityEngine.Object loaded = null;
+                try {
+                    loaded = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                } catch {
+                    continue;
+                }
                 if(!loaded) 
                     continue;
                 if (loaded.GetType() != typeof(GameObject)) continue;
@@ -628,7 +647,7 @@ namespace OdessaEngine.NETS.Core {
         }
         //Internal
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
-            var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={applicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
+            var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -647,7 +666,7 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
         protected void InternalJoinRoom(string RoomName, Action<RoomState> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={applicationGuid}&roomName={RoomName}");
+            var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={settings.ApplicationGuid}&roomName={RoomName}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -676,7 +695,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinAnyRoom() {
         }
         protected void InternalGetAllRooms(Action<List<RoomState>> CallBack) {
-            var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={applicationGuid}");
+            var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={settings.ApplicationGuid}");
             StartCoroutine( SendOnWebRequestComplete( webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
@@ -695,7 +714,7 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
         protected void InternalJoinOrCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
-            var webRequest = UnityWebRequest.Get($"{url}/joinOrCreateRoom?token={applicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
+            var webRequest = UnityWebRequest.Get($"{url}/joinOrCreateRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
