@@ -167,7 +167,7 @@ namespace OdessaEngine.NETS.Core {
             _settings = Resources.Load("NETSSettings") as NETSSettings;
             if(!_settings) {
                 var scriptable = ScriptableObject.CreateInstance<NETSSettings>();
-                Directory.CreateDirectory("/Assets/Resources");
+                AssetDatabase.CreateFolder("Assets", "Resources");
                 AssetDatabase.CreateAsset(scriptable, "Assets/Resources/NETSSettings.asset");
                 EditorUtility.SetDirty(scriptable);
                 AssetDatabase.SaveAssets();
