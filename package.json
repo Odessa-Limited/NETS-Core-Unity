@@ -1,7 +1,7 @@
 {
   "name": "com.odessa.nets.core",
   "displayName": "Odessa NETS Core",
-  "version": "0.0.7",
+  "version": "0.0.26",
   "unity": "2018.1",
   "description": "Odessa NETS Core is a multiplayer package for unity Networking. This being the Core version is the default base package needed for using NETS.",
   "keywords": [
