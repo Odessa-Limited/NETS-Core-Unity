@@ -204,7 +204,8 @@ namespace OdessaEngine.NETS.Core {
                 }));
                 yield break;
             }
-            CreateOrJoinRoom(settings.DefaultRoomName);
+            if (settings.AutomaticRoomLogic)
+                InternalJoinAnyRoom();
             ips.Reverse();
         }
         
@@ -656,7 +657,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 RoomState roomState = null;
                 try {
-                    roomState = JsonUtility.FromJson<RoomState>(resultText);
+                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
                     Debug.LogError("NETS Error on server contact devs");
                     return;
@@ -675,7 +676,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 RoomState roomState = null;
                 try {
-                    roomState = JsonUtility.FromJson<RoomState>(resultText);
+                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
                     Debug.LogError("NETS Error on server contact devs");
                     return;
@@ -693,6 +694,21 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
         protected void InternalJoinAnyRoom() {
+            InternalGetAllRooms((available) => {
+                if (available.Count > 0) {
+                    foreach (var av in available) {
+                        if (av.playerCount >= 100) {
+                            continue;
+                        } else {
+                            JoinRoom(av.name);
+                            return;
+                        }
+                    }
+                    CreateOrJoinRoom(Guid.NewGuid().ToString("N"));
+                } else {
+                    CreateOrJoinRoom(settings.DefaultRoomName);
+                }
+            });
         }
         protected void InternalGetAllRooms(Action<List<RoomState>> CallBack) {
             var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={settings.ApplicationGuid}");
@@ -704,7 +720,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 List<RoomState> roomStates = new List<RoomState>();
                 try {
-                    roomStates = JsonUtility.FromJson<List<RoomState>>(resultText);
+                    roomStates = JsonConvert.DeserializeObject<List<RoomState>>(resultText);
                 } catch (Exception e) {
                     Debug.LogError("NETS Error on server contact devs");
                     return;
@@ -723,7 +739,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 RoomState roomState = null;
                 try {
-                    roomState = JsonUtility.FromJson<RoomState>(resultText);
+                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
                     Debug.LogError("NETS Error on server contact devs");
                     return;

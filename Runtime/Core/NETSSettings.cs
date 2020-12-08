@@ -12,6 +12,8 @@ namespace OdessaEngine.NETS.Core {
 		public string ApplicationGuid = Guid.NewGuid().ToString("N");
 		[SerializeField]
 		public string DefaultRoomName = "default";
+		[SerializeField]
+		public bool AutomaticRoomLogic = true;
 
 		[Header("NETS Developer Tools")]
 		[SerializeField]
