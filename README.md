@@ -21,7 +21,6 @@
   ],
   "dependencies": {
     "jillejr.newtonsoft.json-for-unity": "12.0.301",
-    "jillejr.newtonsoft.json-for-unity.converters": "1.0.0",
     "com.odessa.nets.core": "0.0.2",
     ...
     }
