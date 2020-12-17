@@ -30,13 +30,39 @@ namespace OdessaEngine.NETS.Core {
 
         [Range(0, 500)]
         public float DebugLatency = 0f;
+
         private NETSSettings _settings;
         private NETSSettings settings {
             get{
                 if (!_settings)
                     LoadOrCreateSettings();
                 return _settings;
-            } 
+            }
+        }
+        private NETSNetworkedTypesLists _typedLists;
+        private NETSNetworkedTypesLists typedLists {
+            get {
+                if (!_typedLists)
+                    _typedLists = GetTypedList();
+                return _typedLists;
+            }
+        }
+        private NetsObjectPool<GameObject> NetsObjectPool = new NetsObjectPool<GameObject>();
+
+        private static NETSNetworkedTypesLists GetTypedList() {
+            var settings = Resources.Load("NETSNetworkedTypesLists") as NETSNetworkedTypesLists;
+#if UNITY_EDITOR
+            if (!settings) {
+                var scriptable = ScriptableObject.CreateInstance<NETSNetworkedTypesLists>();
+                AssetDatabase.CreateFolder("Assets", "Resources");
+                AssetDatabase.CreateAsset(scriptable, "Assets/Resources/NETSNetworkedTypesLists.asset");
+                EditorUtility.SetDirty(scriptable);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                settings = Resources.Load("NETSNetworkedTypesLists") as NETSNetworkedTypesLists;
+            }
+#endif
+            return settings;
         }
 
         string url { get { return settings.UseLocalConnectionInUnity ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_URL; } }
@@ -165,6 +191,7 @@ namespace OdessaEngine.NETS.Core {
         }
         private bool LoadOrCreateSettings() {
             _settings = Resources.Load("NETSSettings") as NETSSettings;
+#if UNITY_EDITOR
             if(!_settings) {
                 var scriptable = ScriptableObject.CreateInstance<NETSSettings>();
                 AssetDatabase.CreateFolder("Assets", "Resources");
@@ -174,6 +201,7 @@ namespace OdessaEngine.NETS.Core {
                 AssetDatabase.Refresh();
                 _settings = Resources.Load("NETSSettings") as NETSSettings;
             }
+#endif
             return true;
         }
 
@@ -345,7 +373,7 @@ namespace OdessaEngine.NETS.Core {
                 keyPairEntityCollectors[roomGuid].ApplyDelta(bb, false);
                 if (initializedSingletons == false) {
                     if (IsServer) {
-                        foreach (var s in ServerSingletonsList)
+                        foreach (var s in typedLists.ServerSingletonsList)
                             if (KnownServerSingletons.ContainsKey(s.name) == false)
                                 Instantiate(s.prefab);
                         initializedSingletons = true;
@@ -476,59 +504,11 @@ namespace OdessaEngine.NETS.Core {
         Dictionary<string, NetworkObjectConfig> _networkedTypesLookup;
         public Dictionary<string, NetworkObjectConfig> NetworkedTypesLookup { 
             get {
-                if (_networkedTypesLookup == null) _networkedTypesLookup = NetworkedTypesList.ToDictionary(t => t.name, t => t);
+                if (_networkedTypesLookup == null) _networkedTypesLookup = typedLists.NetworkedTypesList.ToDictionary(t => t.name, t => t);
                 return _networkedTypesLookup;
             }
         }
 
-        [HideInInspector]
-        public List<NetworkObjectConfig> NetworkedTypesList = new List<NetworkObjectConfig>();
-        [HideInInspector]
-        public List<NetworkObjectConfig> ServerSingletonsList = new List<NetworkObjectConfig>();
-
-#if UNITY_EDITOR
-        void Update() {
-            if (Application.isPlaying) return;
-            NetworkedTypesList.Clear();
-            ServerSingletonsList.Clear();
-
-            var allPaths = AssetDatabase.GetAllAssetPaths();
-            foreach (var path in allPaths) {
-                UnityEngine.Object loaded = null;
-                try {
-                    loaded = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                } catch {
-                    continue;
-                }
-                if(!loaded) 
-                    continue;
-                if (loaded.GetType() != typeof(GameObject)) continue;
-                var asGo = loaded as GameObject;
-
-                var networkedComponentList = asGo.GetComponents<NetsEntity>().ToList();
-                if (networkedComponentList.Count == 0) continue;
-                if (networkedComponentList.Count > 1) {
-                    Console.Error.WriteLine("Entity " + path + " has two NetsEntity components");
-                    continue;
-                }
-                var networkedComponent = networkedComponentList.Single();
-                //if (networkedComponent.GetType().Name != asGo.name) throw new Exception("Name mismatch - Gameobject " + asGo.name + " has networked class " + networkedComponent.GetType().Name);
-                if (NetworkedTypesList.Any(n => n.name == networkedComponent.GetType().Name)) continue;
-                networkedComponent.prefab = asGo.name;
-                NetworkedTypesList.Add(new NetworkObjectConfig {
-                    name = asGo.name,
-                    prefab = asGo,
-                });
-                if (networkedComponent.Authority == AuthorityEnum.ServerSingleton) {
-                    ServerSingletonsList.Add(new NetworkObjectConfig {
-                        name = asGo.name,
-                        prefab = asGo,
-                    });
-                }
-
-            }
-        }
-#endif
         /// <summary>
         /// Create and or join a room by Name. This is a Http request so requires a callback when the request is complete.
         /// <para>Logic flow:</para>

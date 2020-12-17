@@ -8,6 +8,8 @@ using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine.SocialPlatforms;
+using static OdessaEngine.NETS.Core.NetsNetworking;
+using WebSocketSharp;
 
 #if UNITY_EDITOR
 using UnityEditor.Experimental.SceneManagement;
@@ -15,7 +17,7 @@ using UnityEditor;
 #endif
 
 namespace OdessaEngine.NETS.Core {
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     public class NetsEntity : MonoBehaviour {
         public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
         public Transform addedTransform;
@@ -36,6 +38,7 @@ namespace OdessaEngine.NETS.Core {
         public Guid? creationGuid;
         NetsEntityState state;
         public bool destroyedByServer = false;
+
 
         private static PropertyInfo[] GetValidPropertiesFor(Type t, bool isTopLevel) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
