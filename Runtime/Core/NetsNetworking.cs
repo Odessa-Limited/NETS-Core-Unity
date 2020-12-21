@@ -25,6 +25,8 @@ namespace OdessaEngine.NETS.Core {
         public static Action<RoomState> JoinRoomResponse;
         public static Action<List<RoomState>> GetAllRoomsResponse;
         public static Action<RoomState> CreateRoomResponse;
+        public static Action<Guid> OnJoinedRoom;
+        public static Action<RoomState> OnCreateRoom;
 
         public static Action<int> PlayerCount;
 
@@ -221,7 +223,6 @@ namespace OdessaEngine.NETS.Core {
             //ips.Add("ws://127.0.0.1:" + port);
             //ips.Add("wss://" + URL + ":" + (port + 1000));
             if (settings.HitWorkerDirectly) {
-
                 StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
@@ -287,7 +288,9 @@ namespace OdessaEngine.NETS.Core {
                             DestroyEntity(entity.Id);
                             throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
                         }
-                        var newGo = Instantiate(typeToCreate.prefab, new Vector3(999999999,999999999,99999999), Quaternion.Euler(0,0,0));
+                        var newGo = Instantiate(typeToCreate.prefab);
+                        newGo.transform.position = new Vector3(999999999, 999999999, 99999999);
+                        newGo.transform.rotation=  Quaternion.Euler(0,0,0);
                         var component = newGo.GetComponent<NetsEntity>();
                         if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
                         entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
@@ -366,7 +369,7 @@ namespace OdessaEngine.NETS.Core {
                         Debug.LogError(e);
                     }
                 };
-
+                OnJoinedRoom?.Invoke(roomGuid);
             } else if (category == (byte)WorkerToClientMessageType.KeyPairEntityEvent) {
                 var roomGuid = bb.ReadGuid();
                 //print($"Got entity change for room {roomGuid:N}");
@@ -644,6 +647,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 CallBack?.Invoke(roomState);
                 CreateRoomResponse?.Invoke(roomState);
+                OnCreateRoom?.Invoke(roomState);
             }));
         }
         protected void InternalJoinRoom(string RoomName, Action<RoomState> CallBack = null) {
