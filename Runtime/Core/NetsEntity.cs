@@ -38,6 +38,7 @@ namespace OdessaEngine.NETS.Core {
         public Guid? creationGuid;
         NetsEntityState state;
         public bool destroyedByServer = false;
+        public bool hasStarted = false;
 
 
         private static PropertyInfo[] GetValidPropertiesFor(Type t, bool isTopLevel) => t
@@ -88,6 +89,12 @@ namespace OdessaEngine.NETS.Core {
 
             if (Authority == AuthorityEnum.ServerSingleton) NetsNetworking.KnownServerSingletons.Add(prefab, this);
         }
+        private void NetsStart() {
+            if (hasStarted) return;
+            foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
+                c.NetsStart();
+            hasStarted = true;
+        }
 
         private void TryCreateOnServer() {
             if (NetsNetworking.instance?.canSend != true) return;
@@ -121,6 +128,8 @@ namespace OdessaEngine.NETS.Core {
                 }
             }
             state = NetsEntityState.Insync;
+            if (OwnedByMe)
+                NetsStart();
         }
 
         void Start() {
@@ -128,6 +137,8 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
             StartCoroutine(createOnServer());
+            if (Authority.IsServerOwned() == false && OwnedByMe)
+                NetsStart();
         }
 
         /// <summary>
