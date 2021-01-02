@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public static class NetsNetworkingConsts {
-    public static int NETS_ROOM_SERVICE_PORT = 8001;
     public static string NETS_URL { 
         get {
-            return (NETS_USING_SECURE ? "https" : "http") + "://roomservice.nets.odessaengine.com" + ( NETS_USING_SECURE ? "" : ":" + NETS_ROOM_SERVICE_PORT );
+            return "https://netstest.odessaengine.com/nets-room-service";
         }
     }
     public static bool NETS_USING_SECURE { 
