@@ -26,9 +26,11 @@ namespace OdessaEngine.NETS.Core {
         public static Action<List<RoomState>> GetAllRoomsResponse;
         public static Action<RoomState> CreateRoomResponse;
         public static Action<Guid> OnJoinedRoom;
+        public static Action<Guid> OnJoinedLeft;
         public static Action<RoomState> OnCreateRoom;
 
         public static Action<int> PlayerCount;
+        public static List<Guid> RoomsJoined = new List<Guid>();
 
         [Range(0, 500)]
         public float DebugLatency = 0f;
@@ -145,7 +147,7 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
             w.Send(BitUtils.ArrayFromStream(bos => {
-                bos.WriteByte((byte)WorkerToClientMessageType.Ping);
+                bos.WriteByte((byte)ClientToWorkerMessageType.Pong);
                 bos.WriteGuid(requestId);
             }));
         }
@@ -370,6 +372,7 @@ namespace OdessaEngine.NETS.Core {
                     }
                 };
                 OnJoinedRoom?.Invoke(roomGuid);
+                RoomsJoined.Add(roomGuid);
             } else if (category == (byte)WorkerToClientMessageType.KeyPairEntityEvent) {
                 var roomGuid = bb.ReadGuid();
                 //print($"Got entity change for room {roomGuid:N}");
@@ -402,6 +405,10 @@ namespace OdessaEngine.NETS.Core {
                 } catch (Exception e) {
                     Debug.LogError(e);
                 }
+            } else if(category == (byte)WorkerToClientMessageType.LeftRoom) {
+                var roomGuid = bb.ReadGuid();
+                RoomsJoined.Remove(roomGuid);
+                OnJoinedLeft?.Invoke(roomGuid);
             }
         }
 
@@ -604,6 +611,35 @@ namespace OdessaEngine.NETS.Core {
             instance.InternalJoinRoom(RoomName, CallBack);
         }
         /// <summary>
+        /// Join a by Name. This is a Http request so requires a callback when the request is complete.
+        /// <para>Logic flow:</para>
+        /// <para><b>IF</b> the room name <b>DOES</b> exist <b>THEN</b> join it.</para>
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Basic and fundemental room connection for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// </example>
+        /// 
+        /// <param name="RoomName">Room name to try to Join. Can be any string, but must have been created by <see cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/> or by listed by <see cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/></param>
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// 
+        /// <code>
+        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// </code>
+        /// 
+        public static void LeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
+            instance.InternalLeaveRoom(RoomGuid, CallBack);
+        }
+        /// <summary>
         /// Get all available rooms. This is a Http request so requires a callback when the request is complete.
         /// </summary>
         /// 
@@ -739,6 +775,15 @@ namespace OdessaEngine.NETS.Core {
                 CallBack?.Invoke(roomState);
                 CreateRoomResponse?.Invoke(roomState);
                 JoinRoomResponse?.Invoke(roomState);
+            }));
+        }
+        Dictionary<Guid, Action<Guid>> leaveRoomCallbacks = new Dictionary<Guid, Action<Guid>>();
+        protected void InternalLeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
+            var requestGuid = Guid.NewGuid();
+            w.Send(BitUtils.ArrayFromStream(bos => {
+                bos.WriteByte((byte)ClientToWorkerMessageType.LeaveRoom);
+                bos.WriteGuid(RoomGuid);
+                bos.WriteGuid(requestGuid);
             }));
         }
 
