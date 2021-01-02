@@ -455,7 +455,6 @@ namespace OdessaEngine.NETS.Core {
                 yield break;
             }
 
-            print("Connected to " + url);
             w = conn;
             connected = true;
             keyPairEntityCollectors.Clear();
@@ -642,7 +641,7 @@ namespace OdessaEngine.NETS.Core {
         /// <summary>
         /// Get all available rooms. This is a Http request so requires a callback when the request is complete.
         /// </summary>
-        /// 
+        /// NETS Error on server contact devs
         /// <remarks>
         /// Basic and fundemental room connection for NETS.
         /// 
@@ -671,14 +670,14 @@ namespace OdessaEngine.NETS.Core {
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 RoomState roomState = null;
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 CallBack?.Invoke(roomState);
@@ -691,14 +690,14 @@ namespace OdessaEngine.NETS.Core {
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 RoomState roomState = null;
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
@@ -735,14 +734,14 @@ namespace OdessaEngine.NETS.Core {
             StartCoroutine( SendOnWebRequestComplete( webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 List<RoomState> roomStates = new List<RoomState>();
                 try {
                     roomStates = JsonConvert.DeserializeObject<List<RoomState>>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 CallBack?.Invoke(roomStates);
@@ -754,14 +753,14 @@ namespace OdessaEngine.NETS.Core {
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
                     //This should probably send a notification to our channels via webhook
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 RoomState roomState = null;
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError("NETS Error on server contact devs");
+                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
                 }
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
