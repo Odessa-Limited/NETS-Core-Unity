@@ -677,7 +677,7 @@ namespace OdessaEngine.NETS.Core {
             if (req.responseCode != 200) {
                 //This should probably send a notification to our channels via webhook
                 Debug.LogError($"NETS Error on server contact devs. Code: {req.responseCode} Error: {response}");
-                return true;
+                return false;
             }
 
             try {
