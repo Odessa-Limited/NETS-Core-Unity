@@ -410,6 +410,10 @@ namespace OdessaEngine.NETS.Core {
                 var roomGuid = bb.ReadGuid();
                 RoomsJoined.Remove(roomGuid);
                 OnJoinedLeft?.Invoke(roomGuid);
+                foreach(var left in leaveRoomCallbacks.Where(o => o.Key.Equals(roomGuid))) {
+                    leaveRoomCallbacks.Remove(left.Key);
+                    left.Value?.Invoke(left.Key);
+                }
             }
         }
 
@@ -678,7 +682,7 @@ namespace OdessaEngine.NETS.Core {
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
+                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
                     return;
                 }
                 CallBack?.Invoke(roomState);
@@ -698,7 +702,7 @@ namespace OdessaEngine.NETS.Core {
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
+                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
                     return;
                 }
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
@@ -742,7 +746,7 @@ namespace OdessaEngine.NETS.Core {
                 try {
                     roomStates = JsonConvert.DeserializeObject<List<RoomState>>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
+                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
                     return;
                 }
                 CallBack?.Invoke(roomStates);
@@ -761,7 +765,7 @@ namespace OdessaEngine.NETS.Core {
                 try {
                     roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
                 } catch (Exception e) {
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
+                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
                     return;
                 }
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
@@ -779,6 +783,7 @@ namespace OdessaEngine.NETS.Core {
         }
         Dictionary<Guid, Action<Guid>> leaveRoomCallbacks = new Dictionary<Guid, Action<Guid>>();
         protected void InternalLeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
+            leaveRoomCallbacks.Add(RoomGuid, CallBack);
             var requestGuid = Guid.NewGuid();
             w.Send(BitUtils.ArrayFromStream(bos => {
                 bos.WriteByte((byte)ClientToWorkerMessageType.LeaveRoom);
