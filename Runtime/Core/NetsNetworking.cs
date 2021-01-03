@@ -670,21 +670,29 @@ namespace OdessaEngine.NETS.Core {
             instance.InternalGetAllRooms(CallBack);
         }
         //Internal
+
+        protected bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
+            obj = default(T);
+
+            if (req.responseCode != 200) {
+                //This should probably send a notification to our channels via webhook
+                Debug.LogError($"NETS Error on server contact devs. Code: {req.responseCode} Error: {response}");
+                return true;
+            }
+
+            try {
+                obj = JsonConvert.DeserializeObject<T>(response);
+                return true;
+            } catch (Exception e) {
+                Debug.LogError($"NETS format error on server contact devs, Error: {e}");
+                return false;
+            }
+        }
+
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (webRequest.responseCode != 200) {
-                    //This should probably send a notification to our channels via webhook
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
-                    return;
-                }
-                RoomState roomState = null;
-                try {
-                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
-                } catch (Exception e) {
-                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
-                    return;
-                }
+                if (!TryGetObjectFromResponse(webRequest, resultText, out RoomState roomState)) return;
                 CallBack?.Invoke(roomState);
                 CreateRoomResponse?.Invoke(roomState);
                 OnCreateRoom?.Invoke(roomState);
@@ -693,18 +701,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinRoom(string RoomName, Action<RoomState> CallBack = null) {
             var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={settings.ApplicationGuid}&roomName={RoomName}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (webRequest.responseCode != 200) {
-                    //This should probably send a notification to our channels via webhook
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
-                    return;
-                }
-                RoomState roomState = null;
-                try {
-                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
-                } catch (Exception e) {
-                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
-                    return;
-                }
+                if (!TryGetObjectFromResponse(webRequest, resultText, out RoomState roomState)) return;
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
@@ -737,18 +734,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalGetAllRooms(Action<List<RoomState>> CallBack) {
             var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={settings.ApplicationGuid}");
             StartCoroutine( SendOnWebRequestComplete( webRequest, (resultText) => {
-                if (webRequest.responseCode != 200) {
-                    //This should probably send a notification to our channels via webhook
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
-                    return;
-                }
-                List<RoomState> roomStates = new List<RoomState>();
-                try {
-                    roomStates = JsonConvert.DeserializeObject<List<RoomState>>(resultText);
-                } catch (Exception e) {
-                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
-                    return;
-                }
+                if (!TryGetObjectFromResponse(webRequest, resultText, out List<RoomState> roomStates)) return;
                 CallBack?.Invoke(roomStates);
                 GetAllRoomsResponse?.Invoke(roomStates);
             }));
@@ -756,18 +742,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinOrCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/joinOrCreateRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (webRequest.responseCode != 200) {
-                    //This should probably send a notification to our channels via webhook
-                    Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
-                    return;
-                }
-                RoomState roomState = null;
-                try {
-                    roomState = JsonConvert.DeserializeObject<RoomState>(resultText);
-                } catch (Exception e) {
-                    Debug.LogError($"NETS format error on server contact devs, Error: {resultText}");
-                    return;
-                }
+                if (!TryGetObjectFromResponse(webRequest, resultText, out RoomState roomState)) return;
                 StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
                 StartCoroutine(WaitUntilConnected(() => {
                     var sendData = BitUtils.ArrayFromStream(bos => {
