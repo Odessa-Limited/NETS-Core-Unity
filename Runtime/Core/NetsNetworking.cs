@@ -684,7 +684,7 @@ namespace OdessaEngine.NETS.Core {
                 obj = JsonConvert.DeserializeObject<T>(response);
                 return true;
             } catch (Exception e) {
-                Debug.LogError($"NETS format error on server contact devs, Error: {e}");
+                Debug.LogError($"NETS format error on server contact devs, Error: {e} Response: {response}");
                 return false;
             }
         }
