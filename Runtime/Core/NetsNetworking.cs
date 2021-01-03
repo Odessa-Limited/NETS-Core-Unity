@@ -12,6 +12,7 @@ using Odessa.Nets.Core.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.UnityConverters.Math;
 using static OdessaEngine.NETS.Core.NetsEntity;
+using UnityEditor.PackageManager;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -668,7 +669,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
+                if (webRequest.responseCode != 200) {
                     //This should probably send a notification to our channels via webhook
                     Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
@@ -688,7 +689,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinRoom(string RoomName, Action<RoomState> CallBack = null) {
             var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={settings.ApplicationGuid}&roomName={RoomName}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
+                if (webRequest.responseCode != 200) {
                     //This should probably send a notification to our channels via webhook
                     Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
@@ -732,7 +733,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalGetAllRooms(Action<List<RoomState>> CallBack) {
             var webRequest = UnityWebRequest.Get($"{url}/listRooms?token={settings.ApplicationGuid}");
             StartCoroutine( SendOnWebRequestComplete( webRequest, (resultText) => {
-                if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
+                if (webRequest.responseCode != 200) {
                     //This should probably send a notification to our channels via webhook
                     Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
@@ -751,7 +752,7 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalJoinOrCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/joinOrCreateRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                if (string.IsNullOrEmpty(resultText) || resultText.ToLower().Contains("exception")) {
+                if (webRequest.responseCode != 200) {
                     //This should probably send a notification to our channels via webhook
                     Debug.LogError($"NETS Error on server contact devs, Error: {resultText}");
                     return;
