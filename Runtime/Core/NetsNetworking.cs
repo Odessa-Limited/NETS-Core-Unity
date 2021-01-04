@@ -793,6 +793,7 @@ namespace OdessaEngine.NETS.Core {
         }
         Dictionary<Guid, Action<Guid>> leaveRoomCallbacks = new Dictionary<Guid, Action<Guid>>();
         protected void InternalLeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
+            if (leaveRoomCallbacks.ContainsKey(RoomGuid)) return;
             leaveRoomCallbacks.Add(RoomGuid, CallBack);
             var requestGuid = Guid.NewGuid();
             w.Send(BitUtils.ArrayFromStream(bos => {
