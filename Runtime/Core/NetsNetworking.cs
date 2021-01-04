@@ -12,7 +12,6 @@ using Odessa.Nets.Core.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.UnityConverters.Math;
 using static OdessaEngine.NETS.Core.NetsEntity;
-using UnityEditor.PackageManager;
 
 #if UNITY_EDITOR
 using UnityEditor;
