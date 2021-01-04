@@ -566,6 +566,7 @@ namespace OdessaEngine.NETS.Core {
         /// Other options are
         /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
         /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
         /// </remarks>
         /// 
@@ -596,6 +597,7 @@ namespace OdessaEngine.NETS.Core {
         /// Other options are
         /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
         /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
         /// </remarks>
         /// 
@@ -614,9 +616,9 @@ namespace OdessaEngine.NETS.Core {
             instance.InternalJoinRoom(RoomName, CallBack);
         }
         /// <summary>
-        /// Join a by Name. This is a Http request so requires a callback when the request is complete.
+        /// Leave room by ID. Will leave the room and call the action after you've successfully left the room.
         /// <para>Logic flow:</para>
-        /// <para><b>IF</b> the room name <b>DOES</b> exist <b>THEN</b> join it.</para>
+        /// <para><b>IF</b> the room ID <b>DOES</b> exist <b>THEN</b> leave it.</para>
         /// </summary>
         /// 
         /// <remarks>
@@ -625,22 +627,55 @@ namespace OdessaEngine.NETS.Core {
         /// Other options are
         /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveOnlyRoom(Action{Guid})"/>
         /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
         /// </remarks>
         /// 
         /// <example>
-        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// LeaveRoom("Room2", ( RoomGuid ) => { LeftRoom(RoomGuid); });
         /// </example>
         /// 
-        /// <param name="RoomName">Room name to try to Join. Can be any string, but must have been created by <see cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/> or by listed by <see cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/></param>
+        /// <param name="RoomGuid">Room Guid to try to Leave. Can be any Guid, but must have been Joined by <see cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>. Can be found via <see cref="NetsNetworking.RoomsJoined"/></param>
         /// <param name="CallBack">Action called upon successful completion of Method.</param>
         /// 
         /// <code>
-        /// JoinRoom("Room2", ( RoomState ) => { StartGame(RoomState); });
+        /// LeaveRoom("Room2", ( RoomGuid ) => { LeftRoom(RoomGuid); });
         /// </code>
         /// 
         public static void LeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
             instance.InternalLeaveRoom(RoomGuid, CallBack);
+        }
+        /// <summary>
+        /// Leave only room joined. Will leave the only room currently joined and call the action after you've successfully left the room.
+        /// <para>Logic flow:</para>
+        /// <para><b>IF</b> there is <b>ONLY</b> one room <b>THEN</b> leave it.</para>
+        /// 
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Basic and fundemental room connection for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// LeaveOnlyRoom(( RoomGuid ) => { LeftRoom(RoomGuid); });
+        /// </example>
+        /// 
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// 
+        /// <code>
+        /// LeaveOnlyRoom(( RoomGuid ) => { LeftRoom(RoomGuid); });
+        /// </code>
+        /// 
+        public static bool LeaveOnlyRoom(Action<Guid> CallBack = null) {
+            if (RoomsJoined.Count != 1) return false;
+            instance.InternalLeaveRoom(RoomsJoined.First(), CallBack);
+            return true;
         }
         /// <summary>
         /// Get all available rooms. This is a Http request so requires a callback when the request is complete.
@@ -652,6 +687,7 @@ namespace OdessaEngine.NETS.Core {
         /// Other options are
         /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
         /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
         /// </remarks>
         /// 
