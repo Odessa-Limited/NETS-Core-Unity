@@ -69,7 +69,12 @@ namespace OdessaEngine.NETS.Core {
             return settings;
         }
 
-        string url { get { return settings.UseLocalConnectionInUnity ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_URL; } }
+        string url { get {
+#if UNITY_EDITOR
+                if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8001";
+#endif
+                return NetsNetworkingConsts.NETS_URL; 
+            } }
 
         static NetsNetworking() {
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings
