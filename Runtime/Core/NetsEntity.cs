@@ -365,10 +365,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 return;
             }
-            var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            this.prefab = prefab?.name;
+            this.prefab = PrefabStageUtility.GetCurrentPrefabStage().prefabContentsRoot.name;
             /*
             // First time script/prefab init
             var component = prefab.GetComponent<NetsEntity>();
