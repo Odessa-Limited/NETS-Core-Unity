@@ -335,7 +335,7 @@ namespace OdessaEngine.NETS.Core {
                                         print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
                                         localServerEntities.ForEach(e => {
                                             var comp = e.GetComponent<NetsEntity>();
-                                            comp.destroyedByServer = true; // Avoid throwing
+                                            comp.MarkAsDestroyedByServer(); // Avoid throwing
                                             KnownServerSingletons.Remove(comp.prefab);
                                             Destroy(e.gameObject);
                                         });
@@ -367,7 +367,7 @@ namespace OdessaEngine.NETS.Core {
                     try {
                         //print($"Removed {entity.Id}.{entity.PrefabName}");
                         if (entityIdToNetsEntity[roomGuid].TryGetValue(entity.Id, out var e) && e != null && e.gameObject != null) {
-                            e.destroyedByServer = true;
+                            e.MarkAsDestroyedByServer();
                             Destroy(e.gameObject);
                         }
                         entityIdToNetsEntity[roomGuid].Remove(entity.Id);

@@ -37,7 +37,7 @@ namespace OdessaEngine.NETS.Core {
         public Guid roomGuid;
         public Guid? creationGuid;
         NetsEntityState state;
-        public bool destroyedByServer = false;
+        protected bool destroyedByServer = false;
         public bool hasStarted = false;
 
 
@@ -66,6 +66,9 @@ namespace OdessaEngine.NETS.Core {
             Uninitialized,
             Pending,
             Insync
+        }
+        public void MarkAsDestroyedByServer() {
+            destroyedByServer = true;
         }
 
         public KeyPairEntity localModel;
@@ -355,19 +358,17 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying) return;
 
             if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
-                var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-                if (prefab == null && PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                var ppath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+                var fab = AssetDatabase.LoadAssetAtPath<GameObject>(ppath);
+                if (fab == null && PrefabStageUtility.GetCurrentPrefabStage() == null) {
                     Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 }
                 return;
             }
+            var prefabPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
 
-            if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
-                return;
-            }
-
-            prefab = transform.name;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            this.prefab = prefab?.name;
             /*
             // First time script/prefab init
             var component = prefab.GetComponent<NetsEntity>();
