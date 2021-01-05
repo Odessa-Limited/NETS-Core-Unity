@@ -90,6 +90,7 @@ namespace OdessaEngine.NETS.Core {
 		}
 
 		public T GetLerped() {
+			if ( previousValue.Equals(lastReturnedValue) && lastReturnedValue.Equals(currentValue) ) return currentValue;
 			var percent = ((Time.time - lastReceiveTime) / expectedReceiveDelay) * timeTolerance;
 			percent = Mathf.Clamp(percent, 0, 1);
 			if (type == LerpType.Smooth)
