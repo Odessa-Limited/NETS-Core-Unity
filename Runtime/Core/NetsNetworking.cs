@@ -327,7 +327,8 @@ namespace OdessaEngine.NETS.Core {
                                 }
                                 if (recievedFirstPacket == false) {
                                     if (IsServer == false) {
-                                        var localServerEntities = FindObjectsOfType<NetsEntity>()
+                                        var startingEnts = FindObjectsOfType<NetsEntity>();
+                                        var localServerEntities = startingEnts
                                             .Where(e => e.Authority.IsServerOwned())
                                             .ToList();
                                         print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
@@ -412,7 +413,7 @@ namespace OdessaEngine.NETS.Core {
                 var roomGuid = bb.ReadGuid();
                 RoomsJoined.Remove(roomGuid);
                 OnJoinedLeft?.Invoke(roomGuid);
-                foreach(var left in leaveRoomCallbacks.Where(o => o.Key.Equals(roomGuid))) {
+                foreach(var left in leaveRoomCallbacks.Keys.Where(o => o.Equals(roomGuid))) {
                     leaveRoomCallbacks.Remove(left.Key);
                     left.Value?.Invoke(left.Key);
                 }
