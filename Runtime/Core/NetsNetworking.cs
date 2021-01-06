@@ -327,7 +327,7 @@ namespace OdessaEngine.NETS.Core {
                                 }
                                 if (recievedFirstPacket == false) {
                                     if (IsServer == false) {
-                                        var startingEnts = FindObjectOfType<NetsEntity>();
+                                        var startingEnts = FindObjectsOfType<NetsEntity>();
                                         var localServerEntities = startingEnts
                                             .Where(e => e.Authority.IsServerOwned())
                                             .ToList();
