@@ -295,9 +295,7 @@ namespace OdessaEngine.NETS.Core {
                             DestroyEntity(entity.Id);
                             throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
                         }
-                        var newGo = Instantiate(typeToCreate.prefab);
-                        newGo.transform.position = new Vector3(999999999, 999999999, 99999999);
-                        newGo.transform.rotation=  Quaternion.Euler(0,0,0);
+                        var newGo = Instantiate(typeToCreate.prefab, new Vector3(999999999, 999999999, 99999999), Quaternion.Euler(0,0,0));
                         var component = newGo.GetComponent<NetsEntity>();
                         if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
                         entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
