@@ -414,9 +414,13 @@ namespace OdessaEngine.NETS.Core {
                 RoomsJoined.Remove(roomGuid);
                 OnJoinedLeft?.Invoke(roomGuid);
                 var callbacks = leaveRoomCallbacks.Where(o => o.Key.Equals(roomGuid));
+                var toRemove = new List<KeyValuePair<Guid, Action<Guid>>>();
                 foreach (var left in callbacks) {
-                    leaveRoomCallbacks.Remove(left.Key);
+                    toRemove.Add(left);
                     left.Value?.Invoke(left.Key);
+                }
+                foreach(var remove in toRemove) {
+                    leaveRoomCallbacks.Remove(remove.Key);
                 }
             }
         }
