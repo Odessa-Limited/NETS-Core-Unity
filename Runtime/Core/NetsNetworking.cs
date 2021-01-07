@@ -295,11 +295,17 @@ namespace OdessaEngine.NETS.Core {
                             DestroyEntity(entity.Id);
                             throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
                         }
-                        var newGo = Instantiate(typeToCreate.prefab, new Vector3(999999999, 999999999, 99999999), Quaternion.Euler(0,0,0));
+
+                        typeToCreate.prefab.SetActive(false);
+                        var newGo = Instantiate(typeToCreate.prefab, new Vector3(0, 0, 0), Quaternion.Euler(0,0,0));
+                        typeToCreate.prefab.SetActive(true);
+
+                        newGo.GetComponentsInChildren<NetsBehavior>().ToList().ForEach(b => b.TryInitialize());
                         var component = newGo.GetComponent<NetsEntity>();
                         if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
                         entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
                         component.OnCreatedOnServer(roomGuid, entity);
+                        newGo.SetActive(true);
                     } catch (Exception e) {
                         Debug.LogError(e);
                     }

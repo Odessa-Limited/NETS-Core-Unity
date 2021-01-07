@@ -94,8 +94,10 @@ namespace OdessaEngine.NETS.Core {
         }
         private void NetsStart() {
             if (hasStarted) return;
-            foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
+            foreach (var c in transform.GetComponentsInChildren<NetsBehavior>()) {
                 c.NetsStart();
+                if (OwnedByMe) c.NetsOwnedAwake();
+            }
             hasStarted = true;
         }
 
@@ -131,8 +133,7 @@ namespace OdessaEngine.NETS.Core {
                 }
             }
             state = NetsEntityState.Insync;
-            if (OwnedByMe)
-                NetsStart();
+            NetsStart();
         }
 
         void Start() {
@@ -140,8 +141,6 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
             StartCoroutine(createOnServer());
-            if (Authority.IsServerOwned() == false && OwnedByMe)
-                NetsStart();
         }
 
         /// <summary>
@@ -272,6 +271,7 @@ namespace OdessaEngine.NETS.Core {
                                 };
                                 lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
                                 lerpObj.Lerp.type = objProp.Field.LerpType;
+                                lerpObj.SetValue((Vector3)obj);
                             }
                             lerpObj.Lerp.ValueChanged((Vector3)obj);
                             return;
@@ -285,10 +285,12 @@ namespace OdessaEngine.NETS.Core {
                                 };
                                 lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
                                 lerpObj.Lerp.type = objProp.Field.LerpType;
+                                lerpObj.SetValue((Quaternion)obj);
                             }
                             lerpObj.Lerp.ValueChanged((Quaternion)obj);
                             return;
                         }
+
                     }
 
                     // Else set property directly
@@ -348,9 +350,12 @@ namespace OdessaEngine.NETS.Core {
                     foreach (var lo in pathToLerpQuaternion.Values) {
                         lo.SetValue(lo.Lerp.GetLerped());
                     }
-                } else {
-                    foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
-                        c.NetsUpdate();
+                }
+
+                foreach (var c in transform.GetComponentsInChildren<NetsBehavior>()) {
+                    c.NetsUpdate();
+                    if (OwnedByMe)
+                        c.NetsOwnedUpdate();
                 }
             }
 

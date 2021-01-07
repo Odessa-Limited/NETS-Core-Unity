@@ -1,7 +1,8 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
-    public class NetsBehavior : MonoBehaviour {
+    public abstract class NetsBehavior : MonoBehaviour {
         private NetsEntity _netsEntity;
         public NetsEntity Entity {
             get {
@@ -11,7 +12,29 @@ namespace OdessaEngine.NETS.Core {
 
         }
 
-        public virtual void NetsStart() { }
-        public virtual void NetsUpdate() { }
+        private bool initialized = false;
+        private bool woke = false;
+
+        public void TryInitialize() {
+            if (initialized) return;
+            NetsInitialize();
+            initialized = true;
+        }
+
+        public void Awake() {
+            TryInitialize();
+            if (!woke) {
+                NetsAwake();
+                if (Entity.OwnedByMe) NetsOwnedAwake();
+            }
+        }
+
+        public abstract void NetsInitialize();
+        public abstract void NetsAwake();
+        public abstract void NetsStart();
+        public abstract void NetsUpdate();
+        public virtual void NetsOwnedAwake() { }
+        public virtual void NetsOwnedStart() { }
+        public virtual void NetsOwnedUpdate() { }
     }
 }
