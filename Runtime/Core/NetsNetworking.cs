@@ -12,6 +12,8 @@ using Odessa.Nets.Core.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.UnityConverters.Math;
 using static OdessaEngine.NETS.Core.NetsEntity;
+using System.Text;
+using System.Xml.Serialization;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -21,10 +23,12 @@ using System.IO;
 namespace OdessaEngine.NETS.Core {
     [ExecuteInEditMode]
     public class NetsNetworking : MonoBehaviour {
+        private const string NETS_AUTH_TOKEN = "NETS_AUTH_TOKEN";
         //Hooks
         public static Action<RoomState> JoinRoomResponse;
         public static Action<List<RoomState>> GetAllRoomsResponse;
         public static Action<RoomState> CreateRoomResponse;
+        public static Action<AuthResponse> UserTokenResponse;
         public static Action<Guid> OnJoinedRoom;
         public static Action<Guid> OnJoinedLeft;
         public static Action<RoomState> OnCreateRoom;
@@ -37,12 +41,19 @@ namespace OdessaEngine.NETS.Core {
 
         private NETSSettings _settings;
         private NETSSettings settings {
-            get{
+            get {
                 if (!_settings)
                     LoadOrCreateSettings();
                 return _settings;
             }
         }
+        private static AuthResponse _currentAuth;
+        private static AuthResponse currentAuth { get { return _currentAuth; } set {
+                _currentAuth = value;
+                PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
+                instance.SetTimerToRefreshToken();
+            } }
+        public static AuthResponse UserAuthentication{ get { return currentAuth; } }
         private NETSNetworkedTypesLists _typedLists;
         private NETSNetworkedTypesLists typedLists {
             get {
@@ -695,7 +706,7 @@ namespace OdessaEngine.NETS.Core {
         /// <summary>
         /// Get all available rooms. This is a Http request so requires a callback when the request is complete.
         /// </summary>
-        /// NETS Error on server contact devs
+        /// 
         /// <remarks>
         /// Basic and fundemental room connection for NETS.
         /// 
@@ -719,10 +730,40 @@ namespace OdessaEngine.NETS.Core {
         public static void GetAllRooms(Action<List<RoomState>> CallBack) {
             instance.InternalGetAllRooms(CallBack);
         }
-        //Internal
+        /// <summary>
+        /// Create anonymous user used for NETS. Required for NETS match making. Logic will automatically store the user in player prefs and handle refreshing of auth tokens etc.
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Authenication creation for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
+        /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// CreateAnonUser(( AuthResponse ) => { UI.Instance.UserLoginSuccess(AuthResponse); });
+        /// </example>
+        /// 
+        /// <param name="CallBack">Action called upon successful completion of Method.</param>
+        /// 
+        /// <code>
+        /// CreateAnonUser(( AuthResponse ) => { UI.Instance.UserLoginSuccess(AuthResponse); });
+        /// </code>
+        /// 
+        public static void CreateAnonUser(Action<AuthResponse> CallBack = null) {
+            if(currentAuth == null && PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
+                currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
+            }
+            instance.InternalCreateAnonUser(CallBack);
+        }
 
         protected bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
-            obj = default(T);
+            obj = default;
 
             if (req.responseCode != 200) {
                 //This should probably send a notification to our channels via webhook
@@ -738,7 +779,49 @@ namespace OdessaEngine.NETS.Core {
                 return false;
             }
         }
-
+        protected void InternalCreateAnonUser(Action<AuthResponse> CallBack = null) {
+            var webRequest = UnityWebRequest.Get($"{url}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
+            StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
+                HandleAuthResponse(webRequest, resultText, CallBack);
+            }));
+        }
+        private Coroutine refreshRoutine;
+        protected void SetTimerToRefreshToken() {
+            string userInfo = getUserInfoFromJWT(currentAuth.accessToken);
+            var exp = JsonConvert.DeserializeObject<Expiry>(userInfo);
+            var timeUntilRefresh = exp.iat - exp.exp;
+            if (refreshRoutine != null)
+                StopCoroutine(refreshRoutine);
+            refreshRoutine = StartCoroutine(RefreshToken(timeUntilRefresh));
+        }
+        protected IEnumerator RefreshToken(long ttr) {
+            yield return new WaitUntil(()=> { return DateTime.UtcNow > DateTimeOffset.FromUnixTimeSeconds(ttr).UtcDateTime; });
+        }
+        private void HandleAuthResponse(UnityWebRequest webRequest, string resultText, Action<AuthResponse> CallBack = null) {
+            if (!TryGetObjectFromResponse(webRequest, resultText, out AuthResponse authResponse)) return;
+            currentAuth = authResponse;
+            CallBack?.Invoke(authResponse);
+            UserTokenResponse?.Invoke(authResponse);
+        }
+        protected void InternalRefreshToken(Action<AuthResponse> CallBack = null) {
+            var webRequest = UnityWebRequest.Get($"{url}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
+            StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
+                HandleAuthResponse(webRequest, resultText, CallBack);
+            }));
+        }
+        private string getUserInfoFromJWT(string jwt) {
+            var parts = jwt.Split('.');
+            if (parts.Length > 2) {
+                var decode = parts[1];
+                var padLength = 4 - decode.Length % 4;
+                if (padLength < 4) {
+                    decode += new string('=', padLength);
+                }
+                var bytes = Convert.FromBase64String(decode);
+                return Encoding.ASCII.GetString(bytes);
+            }
+            throw new Exception("Not a JWT");
+        }
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
@@ -829,6 +912,11 @@ namespace OdessaEngine.NETS.Core {
             while(!connected)
                 yield return new WaitForEndOfFrame();
             action?.Invoke();
+        }
+
+        public class Expiry {
+            public long exp;
+            public long iat;
         }
 
 #if UNITY_ANDROID || UNITY_IOS
