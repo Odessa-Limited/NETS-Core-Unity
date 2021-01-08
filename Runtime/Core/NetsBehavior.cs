@@ -22,10 +22,14 @@ namespace OdessaEngine.NETS.Core {
         }
 
         public void Awake() {
-            TryInitialize();
-            if (!woke) {
-                NetsAwake();
-                if (Entity.OwnedByMe) NetsOwnedAwake();
+            try {
+                TryInitialize();
+                if (!woke) {
+                    NetsAwake();
+                    if (Entity.OwnedByMe) NetsOwnedAwake();
+                }
+            } catch(Exception e) {
+                Debug.Log($"NETSAwake error on: {gameObject.name} - {e.Message}");
             }
         }
 
