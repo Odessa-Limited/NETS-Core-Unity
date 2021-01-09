@@ -29,7 +29,7 @@ namespace OdessaEngine.NETS.Core {
                     if (Entity.OwnedByMe) NetsOwnedAwake();
                 }
             } catch(Exception e) {
-                Debug.Log($"NETSAwake error on: {gameObject.name} - {e.Message}");
+                Debug.LogError($"NETSAwake error on: {GetType().Name} - {e.Message} : {e.StackTrace}");
             }
         }
 

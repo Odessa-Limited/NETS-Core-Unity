@@ -14,6 +14,8 @@ using Newtonsoft.Json.UnityConverters.Math;
 using static OdessaEngine.NETS.Core.NetsEntity;
 using System.Text;
 using System.Xml.Serialization;
+using Odessa.Core.Models.Enums;
+using System.Net;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -48,7 +50,14 @@ namespace OdessaEngine.NETS.Core {
             }
         }
         private static AuthResponse _currentAuth;
-        private static AuthResponse currentAuth { get { return _currentAuth; } set {
+        private static AuthResponse currentAuth { 
+            get {
+                if (_currentAuth == null && PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
+                    _currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
+                }
+                return _currentAuth; 
+            }
+            set {
                 _currentAuth = value;
                 PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
                 instance.SetTimerToRefreshToken();
@@ -84,8 +93,17 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8001";
 #endif
-                return NetsNetworkingConsts.NETS_URL; 
-            } }
+                return NetsNetworkingConsts.NETS_ROOM_SERVICE_URL; 
+            }
+        }
+        string authUrl {
+            get {
+#if UNITY_EDITOR
+                if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8002";
+#endif
+                return NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
+            }
+        }
 
         static NetsNetworking() {
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings
@@ -756,15 +774,69 @@ namespace OdessaEngine.NETS.Core {
         /// </code>
         /// 
         public static void CreateAnonUser(Action<AuthResponse> CallBack = null) {
-            if(currentAuth == null && PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
-                currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
-            }
             instance.InternalCreateAnonUser(CallBack);
+        }
+        /// <summary>
+        /// Nets Matchmaking. Pass in settings, update and complete actions and it will handle match making for you.
+        /// If you need meta data included see below. You can include a JSON string for objects.
+        /// <code>
+        /// MatchmakerSettings.Mode
+        /// </code>
+        /// </summary>
+        /// 
+        /// <remarks>
+        /// Matchmaking for NETS.
+        /// 
+        /// Other options are
+        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
+        /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
+        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
+        /// <seealso cref="NetsNetworking.CreateAnonUser(Action{AuthResponse})"/>
+        /// </remarks>
+        /// 
+        /// <example>
+        /// StartMatchMaking(
+        /// new MatchmakerSettings() {
+        ///  MinimumPlayers = 2,
+        ///  MaximumPlayers = 10,
+        ///  WaitForMaximumPlayersSeconds = 30,
+        ///  Mode = "{\"GameMode\":\"Team\"}",
+        ///  },
+        ///  (response)=>UpdateQueueCount(response.RoomState.playerCount),
+        ///  (response)=>EnterGame(),
+        /// );
+        /// </example>
+        /// 
+        /// <param name="Settings">Matchmaking settings for the room to be created.</param>
+        /// <param name="CallBackOnUpdate">Action called when the update request comes back. While In Queue.</param>
+        /// <param name="CallBackOnComplete">Action called when the complete request comes back. When In Game.</param>
+        /// 
+        /// <code>
+        /// StartMatchMaking(
+        /// new MatchmakerSettings() {
+        ///  MinimumPlayers = 2,
+        ///  MaximumPlayers = 10,
+        ///  WaitForMaximumPlayersSeconds = 30,
+        ///  Mode = "{\"GameMode\":\"Team\"}",
+        ///  },
+        ///  (response)=>UpdateQueueCount(response.RoomState.playerCount),
+        ///  (response)=>EnterGame(),
+        /// );
+        /// </code>
+        /// 
+        public static void StartMatchMaking(MatchmakerSettings Settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+            instance.StartCoroutine(instance.InternalMatchMakingRequest(Settings, CallBackOnUpdate, CallBackOnComplete));
         }
 
         protected bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
             obj = default;
-
+            if(req.responseCode == 403) {
+                Debug.Log($"NETS refreshing token");
+                InternalRefreshToken();
+                return false;
+            }
             if (req.responseCode != 200) {
                 //This should probably send a notification to our channels via webhook
                 Debug.LogError($"NETS Error on server contact devs. Code: {req.responseCode} Error: {response}");
@@ -779,9 +851,47 @@ namespace OdessaEngine.NETS.Core {
                 return false;
             }
         }
+        protected IEnumerator InternalMatchMakerRerequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+            Dictionary<string, int> regionalPings = new Dictionary<string, int>();
+            regionalPings.Add("USE", 0);
+            var matchMakingState = MatchMakingState.IN_QUEUE;
+            MatchMakingResponse result = default;
+            while (matchMakingState != MatchMakingState.IN_GAME) {
+                var requestComplete = false;
+                var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonConvert.SerializeObject(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
+                var webRequest = UnityWebRequest.Get(toUseUrl);
+                var coroutine = StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
+                    if (!TryGetObjectFromResponse(webRequest, resultText, out MatchMakingResponse matchMakingResponse)) {
+                        requestComplete = true;
+                        return;
+                    }
+                    matchMakingState = matchMakingResponse.State;
+                    CallBackOnUpdate?.Invoke(matchMakingResponse);
+                    result = matchMakingResponse;
+                    requestComplete = true;
+                }));
+                yield return new WaitUntil(() => requestComplete);
+                yield return new WaitForSeconds(2);
+            }
+            InternalJoinRoom(result.RoomState, CallBackOnComplete);
+        }
+        private Coroutine matchmakingRoutine;
+        protected IEnumerator InternalMatchMakingRequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+         
+            if (currentAuth == null) {
+                //If auth doesn't exist then 
+                InternalCreateAnonUser();
+                yield return new WaitUntil(() => currentAuth != null);
+            }
+            if (matchmakingRoutine != null) {
+                //TODO cancel matchmaking
+            }
+            matchmakingRoutine = StartCoroutine(InternalMatchMakerRerequest(settings, CallBackOnUpdate, CallBackOnComplete));
+        }
         protected void InternalCreateAnonUser(Action<AuthResponse> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{url}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
+            var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
+                Debug.Log($"Response from Create Anon {resultText}");
                 HandleAuthResponse(webRequest, resultText, CallBack);
             }));
         }
@@ -835,17 +945,20 @@ namespace OdessaEngine.NETS.Core {
             var webRequest = UnityWebRequest.Get($"{url}/joinRoom?token={settings.ApplicationGuid}&roomName={RoomName}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 if (!TryGetObjectFromResponse(webRequest, resultText, out RoomState roomState)) return;
-                StartCoroutine(connect($"{(roomState.ip.Contains(":125") ? "wss" : "ws")}://{roomState.ip}"));
-                StartCoroutine(WaitUntilConnected(() => {
-                    var sendData = BitUtils.ArrayFromStream(bos => {
-                        bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                        bos.WriteGuid(Guid.ParseExact(roomState.token, "N"));
-                    });
-                    w.Send(sendData);
-                }));
-                CallBack?.Invoke(roomState);
-                JoinRoomResponse?.Invoke(roomState);
+                InternalJoinRoom(roomState, CallBack);
             }));
+        }
+        protected void InternalJoinRoom(RoomState stateToJoin, Action<RoomState> CallBack = null) {
+            StartCoroutine(connect($"{(stateToJoin.ip.Contains(":125") ? "wss" : "ws")}://{stateToJoin.ip}"));
+            StartCoroutine(WaitUntilConnected(() => {
+                var sendData = BitUtils.ArrayFromStream(bos => {
+                    bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
+                    bos.WriteGuid(Guid.ParseExact(stateToJoin.token, "N"));
+                });
+                w.Send(sendData);
+            }));
+            CallBack?.Invoke(stateToJoin);
+            JoinRoomResponse?.Invoke(stateToJoin);
         }
         protected void InternalJoinAnyRoom() {
             InternalGetAllRooms((available) => {
