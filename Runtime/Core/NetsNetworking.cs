@@ -60,7 +60,7 @@ namespace OdessaEngine.NETS.Core {
             set {
                 _currentAuth = value;
                 PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
-                instance.SetTimerToRefreshToken();
+                instance.SetTimerToRefreshToken(value);
             } }
         public static AuthResponse UserAuthentication{ get { return currentAuth; } }
         private NETSNetworkedTypesLists _typedLists;
