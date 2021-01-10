@@ -914,7 +914,7 @@ namespace OdessaEngine.NETS.Core {
             UserTokenResponse?.Invoke(authResponse);
         }
         protected void InternalRefreshToken(Action<AuthResponse> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{url}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
+            var webRequest = UnityWebRequest.Get($"{authUrl}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                 HandleAuthResponse(webRequest, resultText, CallBack);
             }));
