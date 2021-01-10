@@ -832,7 +832,7 @@ namespace OdessaEngine.NETS.Core {
 
         protected bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
             obj = default;
-            if(req.responseCode == 403) {
+            if(req.responseCode == 401) {
                 Debug.Log($"NETS refreshing token");
                 InternalRefreshToken();
                 return false;
@@ -896,8 +896,8 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
         private Coroutine refreshRoutine;
-        protected void SetTimerToRefreshToken() {
-            string userInfo = getUserInfoFromJWT(currentAuth.accessToken);
+        protected void SetTimerToRefreshToken(AuthResponse resp) {
+            string userInfo = getUserInfoFromJWT(resp.accessToken);
             var exp = JsonConvert.DeserializeObject<Expiry>(userInfo);
             var timeUntilRefresh = exp.iat - exp.exp;
             if (refreshRoutine != null)
