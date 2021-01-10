@@ -428,7 +428,6 @@ namespace OdessaEngine.NETS.Core {
                 var roomGuid = bb.ReadGuid();
                 var accountGuid = bb.ReadGuid();
                 var eventString = bb.ReadString();
-                print($"Got room event room {roomGuid:N}. Account {accountGuid:N}. Event: {eventString:N}");
             } else if (category == (byte)WorkerToClientMessageType.EntityEvent) {
                 var roomGuid = bb.ReadGuid();
                 var senderAccountGuid = bb.ReadGuid();
@@ -891,7 +890,6 @@ namespace OdessaEngine.NETS.Core {
         protected void InternalCreateAnonUser(Action<AuthResponse> CallBack = null) {
             var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
             StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                Debug.Log($"Response from Create Anon {resultText}");
                 HandleAuthResponse(webRequest, resultText, CallBack);
             }));
         }
