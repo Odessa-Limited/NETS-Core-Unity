@@ -358,19 +358,38 @@ namespace OdessaEngine.NETS.Core {
                         c.NetsOwnedUpdate();
                 }
             }
-
+            SyncProperties();
+        }
+        private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();
+        private Dictionary<ulong, MethodInfo> idToMethodLookup = new Dictionary<ulong, MethodInfo>();
+        ulong methodIndex = 0;
+        private void SetUpMethodDict() {
+            if (methodToIdLookup.Count > 0)
+                return;
+            // Get the public methods.
+            // We can garuntee that get components will return the same order every time https://answers.unity.com/questions/1293957/reliable-order-of-components-using-getcomponents.html
+            foreach (var comp in gameObject.GetComponents<MonoBehaviour>()) {
+                if (comp is NetsEntity) continue;
+                var type = comp.GetType();
+                foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)) {
+                    var index = methodIndex;
+                    idToMethodLookup.Add(index, method);
+                    methodToIdLookup.Add(method, index);
+                    methodIndex++;
+                }
+            }
+        }
+        public void SyncProperties() {
 #if UNITY_EDITOR
-            if (Application.isPlaying) return;
-
-            if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
+            if (AssetDatabase.GetAssetPath(gameObject) == null) {
                 var ppath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
                 var fab = AssetDatabase.LoadAssetAtPath<GameObject>(ppath);
-                if (fab == null && PrefabStageUtility.GetCurrentPrefabStage() == null) {
+                if (fab == null && AssetDatabase.GetAssetPath(gameObject) == null) {
                     Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 }
                 return;
             }
-            this.prefab = PrefabStageUtility.GetCurrentPrefabStage().prefabContentsRoot.name;
+            this.prefab = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
             /*
             // First time script/prefab init
             var component = prefab.GetComponent<NetsEntity>();
@@ -424,32 +443,13 @@ namespace OdessaEngine.NETS.Core {
                             componentToSync.Fields.Add(propToSync);
                         }
                         propToSync.FieldType = p.PropertyType.Name;
-                        propToSync.PathName = "." +  (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name;
+                        propToSync.PathName = "." + (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name;
                     }
                     componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
                 }
                 obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
             }
 #endif
-        }
-        private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();
-        private Dictionary<ulong, MethodInfo> idToMethodLookup = new Dictionary<ulong, MethodInfo>();
-        ulong methodIndex = 0;
-        private void SetUpMethodDict() {
-            if (methodToIdLookup.Count > 0)
-                return;
-            // Get the public methods.
-            // We can garuntee that get components will return the same order every time https://answers.unity.com/questions/1293957/reliable-order-of-components-using-getcomponents.html
-            foreach (var comp in gameObject.GetComponents<MonoBehaviour>()) {
-                if (comp is NetsEntity) continue;
-                var type = comp.GetType();
-                foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)) {
-                    var index = methodIndex;
-                    idToMethodLookup.Add(index, method);
-                    methodToIdLookup.Add(method, index);
-                    methodIndex++;
-                }
-            }
         }
         public void InterpretMethod(string MethodEvent) {
             if (destroyedByServer) return;//Don't run on ents that are flagged as dead

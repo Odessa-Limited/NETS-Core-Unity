@@ -52,6 +52,9 @@ namespace OdessaEngine.NETS.Core {
         private static AuthResponse _currentAuth;
         private static AuthResponse currentAuth { 
             get {
+                if (!instance.settings.KeepReferenceOfAccount) {
+                    PlayerPrefs.SetString(NETS_AUTH_TOKEN, default);
+                }
                 if (_currentAuth == null && PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
                     _currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
                 }
@@ -59,7 +62,11 @@ namespace OdessaEngine.NETS.Core {
             }
             set {
                 _currentAuth = value;
-                PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
+                if (instance.settings.KeepReferenceOfAccount) {
+                    PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
+                } else {
+                    PlayerPrefs.SetString(NETS_AUTH_TOKEN, default);
+                }
                 instance.SetTimerToRefreshToken(value);
             } }
         public static AuthResponse UserAuthentication{ get { return currentAuth; } }
@@ -90,17 +97,17 @@ namespace OdessaEngine.NETS.Core {
         }
 
         string url { get {
-#if UNITY_EDITOR
+//#if UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8001";
-#endif
+//#endif
                 return NetsNetworkingConsts.NETS_ROOM_SERVICE_URL; 
             }
         }
         string authUrl {
             get {
-#if UNITY_EDITOR
+//#if UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8002";
-#endif
+//#endif
                 return NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
             }
         }
@@ -458,7 +465,6 @@ namespace OdessaEngine.NETS.Core {
                 }
             }
         }
-
         IEnumerator connect(string url) {
             if (connected) {
                 if (settings.DebugConnections)

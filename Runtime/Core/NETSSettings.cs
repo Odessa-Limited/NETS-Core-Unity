@@ -14,6 +14,8 @@ namespace OdessaEngine.NETS.Core {
 		public string DefaultRoomName = "default";
 		[SerializeField]
 		public bool AutomaticRoomLogic = true;
+		[SerializeField]
+		public bool KeepReferenceOfAccount = true;
 
 		[Header("NETS Developer Tools")]
 		[SerializeField]

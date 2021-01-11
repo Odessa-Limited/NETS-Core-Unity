@@ -7,8 +7,17 @@ using static OdessaEngine.NETS.Core.NetsEntity;
 using static OdessaEngine.NETS.Core.NetsNetworking;
 
 namespace OdessaEngine.NETS.Core {
-    public class NetsInitialization {
+    public static class NetsInitialization {
 
+        [UnityEditor.Callbacks.DidReloadScripts]
+        private static void CreateAssetWhenReady() {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating) {
+                EditorApplication.delayCall += CreateAssetWhenReady;
+                return;
+            }
+
+            EditorApplication.delayCall += OnRuntimeMethodLoad;
+        }
         [RuntimeInitializeOnLoadMethod]
         static void OnRuntimeMethodLoad() {
             if (UnityEngine.Object.FindObjectsOfType<NetsNetworking>().Length == 0) {
@@ -20,6 +29,7 @@ namespace OdessaEngine.NETS.Core {
             lists.NetworkedTypesList = new List<NetworkObjectConfig>();
             lists.ServerSingletonsList = new List<NetworkObjectConfig>();
             SaveTypedList(lists);
+
 
             var allPaths = AssetDatabase.GetAllAssetPaths();
             foreach (var path in allPaths) {
@@ -37,10 +47,12 @@ namespace OdessaEngine.NETS.Core {
                 var networkedComponentList = asGo.GetComponents<NetsEntity>().ToList();
                 if (networkedComponentList.Count == 0) continue;
                 if (networkedComponentList.Count > 1) {
-                    Console.Error.WriteLine("Entity " + path + " has two NetsEntity components");
+                     Debug.LogError("Entity " + path + " has two NetsEntity components");
                     continue;
                 }
                 var networkedComponent = networkedComponentList.Single();
+                networkedComponent.SyncProperties();
+                EditorUtility.SetDirty(networkedComponent);
                 //if (networkedComponent.GetType().Name != asGo.name) throw new Exception("Name mismatch - Gameobject " + asGo.name + " has networked class " + networkedComponent.GetType().Name);
                 if (lists.NetworkedTypesList.Any(n => n.name == networkedComponent.GetType().Name)) continue;
                 networkedComponent.prefab = asGo.name;
