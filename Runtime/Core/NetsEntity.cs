@@ -358,7 +358,8 @@ namespace OdessaEngine.NETS.Core {
                         c.NetsOwnedUpdate();
                 }
             }
-            SyncProperties();
+            //Shouldn't need to sync every frame
+            //SyncProperties();
         }
         private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();
         private Dictionary<ulong, MethodInfo> idToMethodLookup = new Dictionary<ulong, MethodInfo>();
@@ -389,7 +390,12 @@ namespace OdessaEngine.NETS.Core {
                 }
                 return;
             }
-            this.prefab = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+            var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+            var split = longPath.Split('/');
+            var prefabName = split.Last();
+            var prefabSplit = prefabName.Split('.');
+            var final = prefabSplit.First();
+            this.prefab = final;
             /*
             // First time script/prefab init
             var component = prefab.GetComponent<NetsEntity>();

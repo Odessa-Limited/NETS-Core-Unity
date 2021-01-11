@@ -9,6 +9,7 @@ using static OdessaEngine.NETS.Core.NetsNetworking;
 namespace OdessaEngine.NETS.Core {
     public static class NetsInitialization {
 
+#if UNITY_EDITOR
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void CreateAssetWhenReady() {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating) {
@@ -24,7 +25,6 @@ namespace OdessaEngine.NETS.Core {
                 var go = new GameObject("NETS");
                 go.AddComponent<NetsNetworking>();
             }
-#if UNITY_EDITOR
             var lists = GetTypedList();
             lists.NetworkedTypesList = new List<NetworkObjectConfig>();
             lists.ServerSingletonsList = new List<NetworkObjectConfig>();
@@ -68,8 +68,8 @@ namespace OdessaEngine.NETS.Core {
                 }
                 SaveTypedList(lists);
             }
-#endif
         }
+#endif
         private static NETSNetworkedTypesLists GetTypedList() {
             var settings = Resources.Load("NETSNetworkedTypesLists") as NETSNetworkedTypesLists;
 #if UNITY_EDITOR
