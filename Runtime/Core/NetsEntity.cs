@@ -17,7 +17,7 @@ using UnityEditor;
 #endif
 
 namespace OdessaEngine.NETS.Core {
-    [ExecuteAlways]
+    [ExecuteInEditMode]
     public class NetsEntity : MonoBehaviour {
         public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
         public Transform addedTransform;
@@ -359,7 +359,7 @@ namespace OdessaEngine.NETS.Core {
                 }
             }
             //Shouldn't need to sync every frame
-            //SyncProperties();
+            SyncProperties();
         }
         private Dictionary<MethodInfo, ulong> methodToIdLookup = new Dictionary<MethodInfo, ulong>();
         private Dictionary<ulong, MethodInfo> idToMethodLookup = new Dictionary<ulong, MethodInfo>();
