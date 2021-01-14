@@ -381,8 +381,11 @@ namespace OdessaEngine.NETS.Core {
             }
         }
         public void SyncProperties() {
-#if UNITY_EDITOR
-            if (AssetDatabase.GetAssetPath(gameObject) == null) {
+#if UNITY_EDITOR 
+            bool isPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
+            bool isPrefabOriginal = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) == null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
+            bool isDisconnectedPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) == null;
+            if (AssetDatabase.GetAssetPath(gameObject) == null  && (isPrefabInstance || isPrefabOriginal)) {
                 var ppath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
                 var fab = AssetDatabase.LoadAssetAtPath<GameObject>(ppath);
                 if (fab == null && AssetDatabase.GetAssetPath(gameObject) == null) {

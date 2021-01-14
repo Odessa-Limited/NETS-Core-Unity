@@ -726,7 +726,11 @@ namespace OdessaEngine.NETS.Core {
         /// LeaveOnlyRoom(( RoomGuid ) => { LeftRoom(RoomGuid); });
         /// </code>
         /// 
-        public static bool LeaveRoom(Action<Guid> CallBack = null) {
+        public static void LeaveRoom() {
+            LeaveRoom((_)=> { });
+            return;
+        }
+        private static bool LeaveRoom(Action<Guid> CallBack = null) {
             if (RoomsJoined.Count != 1) return false;
             instance.InternalLeaveRoom(RoomsJoined.First(), CallBack);
             return true;
