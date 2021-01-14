@@ -7,10 +7,12 @@ namespace OdessaEngine.NETS.Core {
         public NetsEntity Entity {
             get {
                 if (_netsEntity == null) _netsEntity = transform.GetComponent<NetsEntity>();
+                if (_netsEntity == null) throw new Exception($"NETS Error: No NetsEntity script attached to object with script {GetType().Name}");
                 return _netsEntity;
             }
 
         }
+        public bool OwnedByMe => Entity?.OwnedByMe == true;
 
         private bool initialized = false;
         private bool woke = false;
