@@ -41,6 +41,7 @@ namespace OdessaEngine.NETS.Core {
                     Debug.LogError($"NETSOwnedAwake error on: {GetType().Name}");
                     Debug.LogError(e);
                 }
+                woke = true;
             }
         }
 

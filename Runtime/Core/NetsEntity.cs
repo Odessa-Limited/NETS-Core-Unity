@@ -96,7 +96,7 @@ namespace OdessaEngine.NETS.Core {
             if (hasStarted) return;
             foreach (var c in transform.GetComponentsInChildren<NetsBehavior>()) {
                 c.NetsStart();
-                if (OwnedByMe) c.NetsOwnedAwake();
+                if (OwnedByMe) c.NetsOwnedStart();
             }
             hasStarted = true;
         }
