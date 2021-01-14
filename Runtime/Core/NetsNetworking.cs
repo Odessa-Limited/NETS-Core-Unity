@@ -857,13 +857,15 @@ namespace OdessaEngine.NETS.Core {
             }
         }
         protected IEnumerator InternalMatchMakerRerequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+            Debug.Log("Match Maker Settings "   + JsonConvert.SerializeObject(settings));
             Dictionary<string, int> regionalPings = new Dictionary<string, int>();
             regionalPings.Add("USE", 0);
             var matchMakingState = MatchMakingState.IN_QUEUE;
             MatchMakingResponse result = default;
             while (matchMakingState != MatchMakingState.IN_GAME) {
                 var requestComplete = false;
-                var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonUtility.ToJson(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
+                var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonConvert.SerializeObject(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
+                Debug.Log("Match Maker url " + JsonConvert.SerializeObject(toUseUrl));
                 var webRequest = UnityWebRequest.Get(toUseUrl);
                 var coroutine = StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                     if (!TryGetObjectFromResponse(webRequest, resultText, out MatchMakingResponse matchMakingResponse)) {
