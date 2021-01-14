@@ -465,7 +465,15 @@ namespace OdessaEngine.NETS.Core {
                 }
             }
         }
-        IEnumerator connect(string url) {
+
+        bool intentionallyDisconnected = false;
+		private void Disconnect() {
+            intentionallyDisconnected = true;
+            w.Close();
+        }
+
+		IEnumerator connect(string url) {
+            intentionallyDisconnected = false;
             if (connected) {
                 if (settings.DebugConnections)
                     print("Already connected");
@@ -497,6 +505,7 @@ namespace OdessaEngine.NETS.Core {
             if (!conn.isConnected) {
                 yield return new WaitForSeconds(.02f);
                 valid = false;
+                if (intentionallyDisconnected) yield break;
                 print("Attempting reconnect...");
                 if (!connected)
                     StartCoroutine(connect(url));
@@ -527,6 +536,7 @@ namespace OdessaEngine.NETS.Core {
                     connected = false;
                     oldConnected = false;
                     OnConnect?.Invoke(false);
+                    if (intentionallyDisconnected) yield break;
                     StartCoroutine(connect(url));
                     yield break;
                 }
@@ -1028,7 +1038,7 @@ namespace OdessaEngine.NETS.Core {
                 bos.WriteGuid(RoomGuid);
                 bos.WriteGuid(requestGuid);
             }));
-            w.Close();
+            Disconnect();
         }
 
         private IEnumerator SendOnWebRequestComplete(UnityWebRequest webRequest, Action<string> onComplete) {
