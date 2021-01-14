@@ -24,12 +24,23 @@ namespace OdessaEngine.NETS.Core {
         public void Awake() {
             try {
                 TryInitialize();
-                if (!woke) {
+            } catch (Exception e) {
+                Debug.LogError($"NETSInitialize error on: {GetType().Name}");
+                Debug.LogError(e);
+            }
+            if (!woke) {
+                try {
                     NetsAwake();
-                    if (Entity.OwnedByMe) NetsOwnedAwake();
+                } catch (Exception e) {
+                    Debug.LogError($"NETSAwake error on: {GetType().Name}");
+                    Debug.LogError(e);
                 }
-            } catch(Exception e) {
-                Debug.LogError($"NETSAwake error on: {GetType().Name} - {e.Message} : {e.StackTrace}");
+                try {
+                    if (Entity.OwnedByMe) NetsOwnedAwake();
+                } catch (Exception e) {
+                    Debug.LogError($"NETSOwnedAwake error on: {GetType().Name}");
+                    Debug.LogError(e);
+                }
             }
         }
 
