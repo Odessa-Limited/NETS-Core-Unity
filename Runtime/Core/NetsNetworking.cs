@@ -832,6 +832,7 @@ namespace OdessaEngine.NETS.Core {
         /// </code>
         /// 
         public static void StartMatchMaking(MatchmakerSettings Settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+            Debug.Log("Match Maker Settings " + JsonConvert.SerializeObject(Settings)); 
             instance.StartCoroutine(instance.InternalMatchMakingRequest(Settings, CallBackOnUpdate, CallBackOnComplete));
         }
 
