@@ -863,7 +863,7 @@ namespace OdessaEngine.NETS.Core {
             MatchMakingResponse result = default;
             while (matchMakingState != MatchMakingState.IN_GAME) {
                 var requestComplete = false;
-                var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonConvert.SerializeObject(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
+                var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonUtility.ToJson(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
                 var webRequest = UnityWebRequest.Get(toUseUrl);
                 var coroutine = StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
                     if (!TryGetObjectFromResponse(webRequest, resultText, out MatchMakingResponse matchMakingResponse)) {
