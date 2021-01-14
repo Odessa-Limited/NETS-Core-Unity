@@ -1024,7 +1024,6 @@ namespace OdessaEngine.NETS.Core {
                 bos.WriteGuid(RoomGuid);
                 bos.WriteGuid(requestGuid);
             }));
-            valid = false;
             w.Close();
         }
 
