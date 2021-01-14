@@ -691,7 +691,11 @@ namespace OdessaEngine.NETS.Core {
         /// LeaveRoom("Room2", ( RoomGuid ) => { LeftRoom(RoomGuid); });
         /// </code>
         /// 
-        public static void LeaveRoom(Guid RoomGuid, Action<Guid> CallBack = null) {
+        public static void LeaveRoom(Guid RoomGuid = default, Action<Guid> CallBack = null) {
+            if(RoomGuid == default) {
+                LeaveRoom(CallBack);
+                return;
+            }
             instance.InternalLeaveRoom(RoomGuid, CallBack);
         }
         /// <summary>
@@ -708,6 +712,7 @@ namespace OdessaEngine.NETS.Core {
         /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
         /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
+        /// <seealso cref="NetsNetworking.LeaveRoom(Action{Guid})"/>
         /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
         /// </remarks>
         /// 
@@ -721,7 +726,7 @@ namespace OdessaEngine.NETS.Core {
         /// LeaveOnlyRoom(( RoomGuid ) => { LeftRoom(RoomGuid); });
         /// </code>
         /// 
-        public static bool LeaveOnlyRoom(Action<Guid> CallBack = null) {
+        public static bool LeaveRoom(Action<Guid> CallBack = null) {
             if (RoomsJoined.Count != 1) return false;
             instance.InternalLeaveRoom(RoomsJoined.First(), CallBack);
             return true;
