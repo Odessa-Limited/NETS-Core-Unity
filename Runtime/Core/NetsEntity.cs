@@ -90,7 +90,7 @@ namespace OdessaEngine.NETS.Core {
                 isNew = true,
             };
 
-            if (Authority == AuthorityEnum.ServerSingleton) NetsNetworking.KnownServerSingletons.Add(prefab, this);
+            if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
         }
         private void NetsStart() {
             if (hasStarted) return;
@@ -138,6 +138,13 @@ namespace OdessaEngine.NETS.Core {
 
         void Start() {
 #if UNITY_EDITOR
+            var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (prefabStage != null) {
+                PrefabUtility.prefabInstanceUpdated += (a) => {
+                    if (a == this)
+                        NetsInitialization.OnRuntimeMethodLoad();
+                };
+            }
             if (Application.isPlaying == false) return;
 #endif
             StartCoroutine(createOnServer());
@@ -381,7 +388,7 @@ namespace OdessaEngine.NETS.Core {
             }
         }
         public void SyncProperties() {
-#if UNITY_EDITOR 
+#if UNITY_EDITOR
             bool isPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
             bool isPrefabOriginal = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) == null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
             bool isDisconnectedPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) == null;

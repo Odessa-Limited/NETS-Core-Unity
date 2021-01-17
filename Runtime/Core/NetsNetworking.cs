@@ -253,32 +253,37 @@ namespace OdessaEngine.NETS.Core {
 		// Use this for initialization
 		public IEnumerator Start() {
             if (!Application.isPlaying) yield break;
-            if (!_settings)
-                LoadOrCreateSettings();
-            instance = this;
+            if (instance == null) {
+                if (!_settings)
+                    LoadOrCreateSettings();
+                instance = this;
 
-            //GameInstance.placeholderEntities = showPlaceholderPrefabs;
+                //GameInstance.placeholderEntities = showPlaceholderPrefabs;
 
-            // Get IP list and connect to them all ( try both http and https, we don't know what we are using )
-            print("Getting servers");
+                // Get IP list and connect to them all ( try both http and https, we don't know what we are using )
+                print("Getting servers");
 
 
-            //ips.Add("ws://127.0.0.1:" + port);
-            //ips.Add("wss://" + URL + ":" + (port + 1000));
-            if (settings.HitWorkerDirectly) {
-                StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
-                StartCoroutine(WaitUntilConnected(() => {
-                    var sendData = BitUtils.ArrayFromStream(bos => {
-                        bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                        bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
-                    });
-                    w.Send(sendData);
-                }));
-                yield break;
+                //ips.Add("ws://127.0.0.1:" + port);
+                //ips.Add("wss://" + URL + ":" + (port + 1000));
+                if (settings.HitWorkerDirectly) {
+                    StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
+                    StartCoroutine(WaitUntilConnected(() => {
+                        var sendData = BitUtils.ArrayFromStream(bos => {
+                            bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
+                            bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
+                        });
+                        w.Send(sendData);
+                    }));
+                    yield break;
+                }
+                if (settings.AutomaticRoomLogic)
+                    InternalJoinAnyRoom();
+                ips.Reverse();
+            } else { 
+                Debug.LogError("Trying to create second Instance of NetsNetworking");
+                Destroy(this.gameObject);
             }
-            if (settings.AutomaticRoomLogic)
-                InternalJoinAnyRoom();
-            ips.Reverse();
         }
         
         bool connected = false;

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using static OdessaEngine.NETS.Core.NetsEntity;
 using static OdessaEngine.NETS.Core.NetsNetworking;
@@ -19,12 +21,18 @@ namespace OdessaEngine.NETS.Core {
 
             EditorApplication.delayCall += OnRuntimeMethodLoad;
         }
-        [RuntimeInitializeOnLoadMethod]
-        static void OnRuntimeMethodLoad() {
-            if (UnityEngine.Object.FindObjectsOfType<NetsNetworking>().Length == 0) {
+#endif
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void AfterSceneLoad() {
+            if (Resources.FindObjectsOfTypeAll<NetsNetworking>().Length == 0) {
                 var go = new GameObject("NETS");
                 go.AddComponent<NetsNetworking>();
             }
+        }
+        [RuntimeInitializeOnLoadMethod]
+        public static void OnRuntimeMethodLoad() {
+#if UNITY_EDITOR
+            if (Application.isPlaying) return;
             var lists = GetTypedList();
             lists.NetworkedTypesList = new List<NetworkObjectConfig>();
             lists.ServerSingletonsList = new List<NetworkObjectConfig>();
@@ -68,8 +76,8 @@ namespace OdessaEngine.NETS.Core {
                 }
                 SaveTypedList(lists);
             }
-        }
 #endif
+        }
         private static NETSNetworkedTypesLists GetTypedList() {
             var settings = Resources.Load("NETSNetworkedTypesLists") as NETSNetworkedTypesLists;
 #if UNITY_EDITOR
