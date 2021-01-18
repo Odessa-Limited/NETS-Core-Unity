@@ -35,7 +35,15 @@ namespace OdessaEngine.NETS.Core {
         public static Action<Guid> OnJoinedLeft;
         public static Action<RoomState> OnCreateRoom;
 
-        public static Action<int> PlayerCount;
+        public static Action<int> OnPlayerCountChange;
+        private static int _PlayerCount = 0;
+        public static int PlayerCount {
+            get { return _PlayerCount; }
+            set {
+                _PlayerCount = value;
+                OnPlayerCountChange?.Invoke(value);
+            }
+        }
         public static List<Guid> RoomsJoined = new List<Guid>();
 
         [Range(0, 500)]
@@ -366,7 +374,7 @@ namespace OdessaEngine.NETS.Core {
                         //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                         if (entity.Id == 1) {
                             if (entity.PrefabName == "Room") {
-                                PlayerCount?.Invoke(entity.GetInt("PlayerCount"));
+                                PlayerCount = entity.GetInt("PlayerCount");
                                 print("ServerAccount: " + entity.GetString("ServerAccount"));
                                 if (entity.GetString("ServerAccount")?.Length == 32) {
                                     IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");

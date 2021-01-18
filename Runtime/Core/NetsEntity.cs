@@ -17,7 +17,7 @@ using UnityEditor;
 #endif
 
 namespace OdessaEngine.NETS.Core {
-    [ExecuteInEditMode]
+    [ExecuteAlways]
     public class NetsEntity : MonoBehaviour {
         public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
         public Transform addedTransform;
@@ -144,6 +144,7 @@ namespace OdessaEngine.NETS.Core {
                     if (a == this)
                         NetsInitialization.OnRuntimeMethodLoad();
                 };
+                SyncProperties();
             }
             if (Application.isPlaying == false) return;
 #endif
@@ -389,82 +390,79 @@ namespace OdessaEngine.NETS.Core {
         }
         public void SyncProperties() {
 #if UNITY_EDITOR
-            bool isPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
-            bool isPrefabOriginal = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) == null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) != null;
-            bool isDisconnectedPrefabInstance = PrefabUtility.GetCorrespondingObjectFromSource(gameObject) != null && PrefabUtility.GetCorrespondingObjectFromSource(gameObject.transform) == null;
-            if (AssetDatabase.GetAssetPath(gameObject) == null  && (isPrefabInstance || isPrefabOriginal)) {
-                var ppath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-                var fab = AssetDatabase.LoadAssetAtPath<GameObject>(ppath);
-                if (fab == null && AssetDatabase.GetAssetPath(gameObject) == null) {
-                    Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
-                }
+            if (Application.isPlaying) return;
+            if (PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab) {
+                Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 return;
             }
-            var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
-            var split = longPath.Split('/');
-            var prefabName = split.Last();
-            var prefabSplit = prefabName.Split('.');
-            var final = prefabSplit.First();
-            this.prefab = final;
-            /*
-            // First time script/prefab init
-            var component = prefab.GetComponent<NetsEntity>();
-            if (component == null) {
-                component = prefab.AddComponent<NetsEntity>();
-                var go = gameObject;
-                DestroyImmediate(this);
-                Selection.activeObject = prefab;
-            }
-            component.prefab = prefab.name;
-            */
-
-
-            // Fill in Objects to sync
-            if (ObjectsToSync.Any(o => o.Transform == transform) == false)
-                ObjectsToSync.Insert(0, new ObjectToSync {
-                    Transform = transform,
-                    Components = new List<ComponentsToSync>(),
-                });
-
-            ObjectsToSync.ForEach(o => o.IsSelf = false);
-            ObjectsToSync[0].IsSelf = true;
-
-            foreach (var obj in ObjectsToSync) {
-                var components = obj.Transform.GetComponents<Component>();
-
-                foreach (var comp in components) {
-                    if (comp is NetsEntity) continue;
-
-                    var componentToSync = obj.Components.FirstOrDefault(f => f.ClassName == comp.GetType().Name);
-                    if (componentToSync == null) {
-                        componentToSync = new ComponentsToSync {
-                            ClassName = comp.GetType().Name,
-                            Fields = new List<ScriptFieldToSync>(),
-                        };
-                        obj.Components.Add(componentToSync);
-                    }
-
-                    var componentFields = new List<ScriptFieldToSync>();
-                    var props = GetValidPropertiesFor(comp.GetType(), obj.IsSelf);
-
-                    foreach (var p in props) {
-                        var propToSync = componentToSync.Fields.FirstOrDefault(f => f.FieldName == p.Name);
-                        if (propToSync == null) {
-                            propToSync = new ScriptFieldToSync {
-                                FieldName = p.Name,
-                                //PathName = "." + obj.Transform + "." + comp.GetType().Name + "." + p.Name,
-                                Enabled = true,
-                                LerpType = LerpType.Velocity,
-                            };
-                            componentToSync.Fields.Add(propToSync);
-                        }
-                        propToSync.FieldType = p.PropertyType.Name;
-                        propToSync.PathName = "." + (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name;
-                    }
-                    componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
+            if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab) {
+                var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+                var split = longPath.Split('/');
+                var prefabName = split.Last();
+                var prefabSplit = prefabName.Split('.');
+                var final = prefabSplit.First();
+                prefab = final;
+                /*
+                // First time script/prefab init
+                var component = prefab.GetComponent<NetsEntity>();
+                if (component == null) {
+                    component = prefab.AddComponent<NetsEntity>();
+                    var go = gameObject;
+                    DestroyImmediate(this);
+                    Selection.activeObject = prefab;
                 }
-                obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
+                component.prefab = prefab.name;
+                */
+                // Fill in Objects to sync
+                if (ObjectsToSync.Any(o => o.Transform == transform) == false)
+                    ObjectsToSync.Insert(0, new ObjectToSync {
+                        Transform = transform,
+                        Components = new List<ComponentsToSync>(),
+                    });
+
+                ObjectsToSync.ForEach(o => o.IsSelf = false);
+                ObjectsToSync[0].IsSelf = true;
+
+                foreach (var obj in ObjectsToSync) {
+                    var components = obj.Transform.GetComponents<Component>();
+
+                    foreach (var comp in components) {
+                        if (comp is NetsEntity) continue;
+
+                        var componentToSync = obj.Components.FirstOrDefault(f => f.ClassName == comp.GetType().Name);
+                        if (componentToSync == null) {
+                            componentToSync = new ComponentsToSync {
+                                ClassName = comp.GetType().Name,
+                                Fields = new List<ScriptFieldToSync>(),
+                            };
+                            obj.Components.Add(componentToSync);
+                        }
+
+                        var componentFields = new List<ScriptFieldToSync>();
+                        var props = GetValidPropertiesFor(comp.GetType(), obj.IsSelf);
+
+                        foreach (var p in props) {
+                            var propToSync = componentToSync.Fields.FirstOrDefault(f => f.FieldName == p.Name);
+                            if (propToSync == null) {
+                                propToSync = new ScriptFieldToSync {
+                                    FieldName = p.Name,
+                                    PathName = "." + (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name,
+                                    Enabled = true,
+                                    LerpType = LerpType.Velocity,
+                                };
+                                componentToSync.Fields.Add(propToSync);
+                            }
+                            propToSync.FieldType = p.PropertyType.Name;
+                            propToSync.PathName = "." + (obj.IsSelf ? this.prefab : obj.Transform.name) + "." + comp.GetType().Name + "." + p.Name;
+                        }
+                        componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
+                    }
+                    obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
+                    EditorUtility.SetDirty(gameObject);
+                }
             }
+
+
 #endif
         }
         public void InterpretMethod(string MethodEvent) {
