@@ -34,6 +34,7 @@ namespace OdessaEngine.NETS.Core {
         public static Action<Guid> OnJoinedRoom;
         public static Action<Guid> OnJoinedLeft;
         public static Action<RoomState> OnCreateRoom;
+        public static Action<MatchMakingResponse> OnMatchMakingSuccess;
 
         public static Action<int> OnPlayerCountChange;
         private static int _PlayerCount = 0;
@@ -42,6 +43,13 @@ namespace OdessaEngine.NETS.Core {
             set {
                 _PlayerCount = value;
                 OnPlayerCountChange?.Invoke(value);
+            }
+        }
+        private static MatchMakingResponse _CurrentMatchMaking =null;
+        public static MatchMakingResponse CurrentMatchMaking {
+            get { return _CurrentMatchMaking; }
+            set {
+                _CurrentMatchMaking = value;
             }
         }
         public static List<Guid> RoomsJoined = new List<Guid>();
@@ -356,7 +364,7 @@ namespace OdessaEngine.NETS.Core {
                         component.OnCreatedOnServer(roomGuid, entity);
                         newGo.SetActive(true);
                     } catch (Exception e) {
-                        Debug.LogError(e);
+                        Debug.LogWarning(e);
                     }
                     return Task.CompletedTask;
                 };
@@ -904,6 +912,8 @@ namespace OdessaEngine.NETS.Core {
                     }
                     matchMakingState = matchMakingResponse.State;
                     CallBackOnUpdate?.Invoke(matchMakingResponse);
+                    OnMatchMakingSuccess?.Invoke(matchMakingResponse);
+                    CurrentMatchMaking = matchMakingResponse;
                     result = matchMakingResponse;
                     requestComplete = true;
                 }));

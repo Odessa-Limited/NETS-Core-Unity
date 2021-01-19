@@ -390,13 +390,15 @@ namespace OdessaEngine.NETS.Core {
         }
         public void SyncProperties() {
 #if UNITY_EDITOR
-            if (Application.isPlaying) return;
-            if (PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab) {
+            if (Application.isPlaying) return; 
+            if (PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab && string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this)) && PrefabStageUtility.GetCurrentPrefabStage() == null) {
                 Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 return;
             }
-            if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab) {
+            if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab || PrefabStageUtility.GetCurrentPrefabStage() == null) {
                 var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
+                if (string.IsNullOrEmpty(longPath))
+                    longPath = PrefabStageUtility.GetCurrentPrefabStage().assetPath;
                 var split = longPath.Split('/');
                 var prefabName = split.Last();
                 var prefabSplit = prefabName.Split('.');
