@@ -120,17 +120,17 @@ namespace OdessaEngine.NETS.Core {
         }
 
         string url { get {
-//#if UNITY_EDITOR
+#if UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8001";
-//#endif
+#endif
                 return NetsNetworkingConsts.NETS_ROOM_SERVICE_URL; 
             }
         }
         string authUrl {
             get {
-//#if UNITY_EDITOR
+#if UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8002";
-//#endif
+#endif
                 return NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
             }
         }
