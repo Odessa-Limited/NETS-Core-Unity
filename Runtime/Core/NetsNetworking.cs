@@ -36,16 +36,23 @@ namespace OdessaEngine.NETS.Core {
         public static Action<RoomState> OnCreateRoom;
         public static Action<MatchMakingResponse> OnMatchMakingSuccess;
 
-        public static Action<int> OnPlayerCountChange;
-        private static int _PlayerCount = 0;
-        public static int PlayerCount {
-            get { return _PlayerCount; }
+        public static Action<List<Guid>> OnPlayersInRoomChange;
+        public static Action<List<Guid>> OnPlayersInRoomLeft;
+        public static Action<List<Guid>> OnPlayersInRoomJoined;
+        private static List<Guid> _PlayersInRoom = new List<Guid>();
+        public static List<Guid> PlayersInRoom {
+            get { return _PlayersInRoom; }
             set {
-                _PlayerCount = value;
-                OnPlayerCountChange?.Invoke(value);
+                var unchanged = _PlayersInRoom.Intersect(value);
+                var left = _PlayersInRoom.Except(unchanged).ToList();
+                var joined = value.Except(unchanged).ToList();
+                OnPlayersInRoomLeft?.Invoke(left.ToList());
+                OnPlayersInRoomJoined?.Invoke(joined.ToList());
+                _PlayersInRoom = value;
+                OnPlayersInRoomChange?.Invoke(value);
             }
         }
-        private static MatchMakingResponse _CurrentMatchMaking =null;
+        private static MatchMakingResponse _CurrentMatchMaking = null;
         public static MatchMakingResponse CurrentMatchMaking {
             get { return _CurrentMatchMaking; }
             set {
@@ -382,7 +389,6 @@ namespace OdessaEngine.NETS.Core {
                         //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                         if (entity.Id == 1) {
                             if (entity.PrefabName == "Room") {
-                                PlayerCount = entity.GetInt("PlayerCount");
                                 print("ServerAccount: " + entity.GetString("ServerAccount"));
                                 if (entity.GetString("ServerAccount")?.Length == 32) {
                                     IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
@@ -443,14 +449,18 @@ namespace OdessaEngine.NETS.Core {
             } else if (category == (byte)WorkerToClientMessageType.KeyPairEntityEvent) {
                 var roomGuid = bb.ReadGuid();
                 //print($"Got entity change for room {roomGuid:N}");
-                keyPairEntityCollectors[roomGuid].ApplyDelta(bb, false);
-                if (initializedSingletons == false) {
-                    if (IsServer) {
-                        foreach (var s in typedLists.ServerSingletonsList)
-                            if (KnownServerSingletons.ContainsKey(s.name) == false)
-                                Instantiate(s.prefab);
-                        initializedSingletons = true;
+                try {
+                    keyPairEntityCollectors[roomGuid].ApplyDelta(bb, false);
+                    if (initializedSingletons == false) {
+                        if (IsServer) {
+                            foreach (var s in typedLists.ServerSingletonsList)
+                                if (KnownServerSingletons.ContainsKey(s.name) == false)
+                                    Instantiate(s.prefab);
+                            initializedSingletons = true;
+                        }
                     }
+                }catch(Exception e) {
+                    Debug.LogError(e);
                 }
             } else if (category == (byte)WorkerToClientMessageType.RoomEvent) {
                 var roomGuid = bb.ReadGuid();
@@ -484,6 +494,13 @@ namespace OdessaEngine.NETS.Core {
                 foreach(var remove in toRemove) {
                     leaveRoomCallbacks.Remove(remove.Key);
                 }
+            } else if (category == (byte)WorkerToClientMessageType.Players) {
+                var length = bb.ReadUnsignedZeroableFibonacci();
+                var playerIds = new List<Guid>();
+                for(ulong i = 0; i < length; i++) {
+                    playerIds.Add(bb.ReadGuid());
+                }
+                PlayersInRoom = playerIds;
             }
         }
 

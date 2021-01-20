@@ -390,15 +390,19 @@ namespace OdessaEngine.NETS.Core {
         }
         public void SyncProperties() {
 #if UNITY_EDITOR
-            if (Application.isPlaying) return; 
-            if (PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab && string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this)) && PrefabStageUtility.GetCurrentPrefabStage() == null) {
+            if (Application.isPlaying) return;
+            if (!PrefabUtility.IsPartOfAnyPrefab(gameObject) && PrefabUtility.GetPrefabInstanceStatus(gameObject) == PrefabInstanceStatus.NotAPrefab && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(gameObject)) && PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab && string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this)) && PrefabStageUtility.GetCurrentPrefabStage() == null) {
                 Debug.LogError($"{gameObject.name} object needs to be a prefab for NetsEntity script to function");
                 return;
             }
-            if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab || PrefabStageUtility.GetCurrentPrefabStage() == null) {
+            if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab || PrefabStageUtility.GetCurrentPrefabStage() != null || !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(gameObject)) || !string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this))) {
                 var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
                 if (string.IsNullOrEmpty(longPath))
                     longPath = PrefabStageUtility.GetCurrentPrefabStage().assetPath;
+                if (string.IsNullOrEmpty(longPath))
+                    longPath = AssetDatabase.GetAssetPath(gameObject);
+                if (string.IsNullOrEmpty(longPath))
+                    longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
                 var split = longPath.Split('/');
                 var prefabName = split.Last();
                 var prefabSplit = prefabName.Split('.');
