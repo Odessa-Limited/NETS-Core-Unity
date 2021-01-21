@@ -149,6 +149,7 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
             StartCoroutine(createOnServer());
+            NetsStart();
         }
 
         /// <summary>
@@ -234,6 +235,7 @@ namespace OdessaEngine.NETS.Core {
                             var objProp = GetPropertyAtPath(f.PathName);
                             if (objProp == null) {
                                 print("Unable to get property at path: " + f.PathName + " - it's null!");
+                                continue;
                             }
                             var objectToSave = objProp.Value();
                             if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
