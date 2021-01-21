@@ -72,27 +72,47 @@ namespace OdessaEngine.NETS.Core {
                 return _settings;
             }
         }
-        private static AuthResponse _currentAuth;
-        private static AuthResponse currentAuth { 
-            get {
+        private static AuthResponse currentAuth;
+        private static long refreshTokenAt = -1;
+        private static bool gettingAuth = false;
+
+        private IEnumerator EnsureAuth() {
+            var needsToken = currentAuth == null;
+            var needsRefresh = DateTimeOffset.Now.ToUnixTimeSeconds() > refreshTokenAt;
+            if ((needsToken || needsRefresh) == false) yield break;
+
+            if (needsToken || needsRefresh) {
+                while (gettingAuth) yield return new WaitForSecondsRealtime(0.1f);
+
+                needsToken = currentAuth == null;
+                needsRefresh = DateTimeOffset.Now.ToUnixTimeSeconds() > refreshTokenAt;
+                if ((needsToken || needsRefresh) == false) yield break;
+
+                gettingAuth = true;
+
                 if (!instance.settings.KeepReferenceOfAccount) {
                     PlayerPrefs.SetString(NETS_AUTH_TOKEN, default);
                 }
-                if (_currentAuth == null && PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
-                    _currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
+
+                if (needsToken) {
+                    if (PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
+                        currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
+                    } else {
+                        var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
+                        yield return webRequest.SendWebRequest();
+                        HandleAuthResponse(webRequest, webRequest.downloadHandler.text);
+                    }
+                } else if (needsRefresh) {
+                    var webRequest = UnityWebRequest.Get($"{authUrl}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
+
+                    yield return webRequest.SendWebRequest();
+                    HandleAuthResponse(webRequest, webRequest.downloadHandler.text);
                 }
-                return _currentAuth; 
+
+                gettingAuth = false;
             }
-            set {
-                _currentAuth = value;
-                if (instance.settings.KeepReferenceOfAccount) {
-                    PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(value));
-                } else {
-                    PlayerPrefs.SetString(NETS_AUTH_TOKEN, default);
-                }
-                instance.SetTimerToRefreshToken(value);
-            } }
-        public static AuthResponse UserAuthentication{ get { return currentAuth; } }
+        }
+
         private NETSNetworkedTypesLists _typedLists;
         private NETSNetworkedTypesLists typedLists {
             get {
@@ -174,8 +194,6 @@ namespace OdessaEngine.NETS.Core {
 
         bool oldConnected = false;
 
-        List<string> ips = new List<string>();
-
         public const string CreationGuidFieldName = ".CreationGuid";
         public static Dictionary<string, NetsEntity> KnownServerSingletons = new Dictionary<string, NetsEntity>();
 
@@ -252,11 +270,36 @@ namespace OdessaEngine.NETS.Core {
             }));
         }
 
-		public void Awake() {
+        public void Awake() {
             if (!Application.isPlaying) return;
             DontDestroyOnLoad(gameObject);
-            LoadOrCreateSettings();
+
+            if (instance != null) {
+                Debug.LogError("Trying to create second Instance of NetsNetworking");
+                Destroy(gameObject);
+                return;
+            }
+            instance = this;
+
+            if (!_settings) LoadOrCreateSettings();
         }
+
+		public void Start() {
+            if (settings.HitWorkerDirectly) {
+                StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
+                StartCoroutine(WaitUntilConnected(() => {
+                    var sendData = BitUtils.ArrayFromStream(bos => {
+                        bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
+                        bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
+                    });
+                    w.Send(sendData);
+                }));
+                return;
+            }
+            if (settings.KeepReferenceOfAccount) StartCoroutine(EnsureAuth());
+            if (settings.AutomaticRoomLogic) InternalJoinAnyRoom();
+        }
+
         private bool LoadOrCreateSettings() {
             _settings = Resources.Load("NETSSettings") as NETSSettings;
 #if UNITY_EDITOR
@@ -273,42 +316,6 @@ namespace OdessaEngine.NETS.Core {
             return true;
         }
 
-		// Use this for initialization
-		public IEnumerator Start() {
-            if (!Application.isPlaying) yield break;
-            if (instance == null) {
-                if (!_settings)
-                    LoadOrCreateSettings();
-                instance = this;
-
-                //GameInstance.placeholderEntities = showPlaceholderPrefabs;
-
-                // Get IP list and connect to them all ( try both http and https, we don't know what we are using )
-                print("Getting servers");
-
-
-                //ips.Add("ws://127.0.0.1:" + port);
-                //ips.Add("wss://" + URL + ":" + (port + 1000));
-                if (settings.HitWorkerDirectly) {
-                    StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
-                    StartCoroutine(WaitUntilConnected(() => {
-                        var sendData = BitUtils.ArrayFromStream(bos => {
-                            bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                            bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
-                        });
-                        w.Send(sendData);
-                    }));
-                    yield break;
-                }
-                if (settings.AutomaticRoomLogic)
-                    InternalJoinAnyRoom();
-                ips.Reverse();
-            } else { 
-                Debug.LogError("Trying to create second Instance of NetsNetworking");
-                Destroy(this.gameObject);
-            }
-        }
-        
         bool connected = false;
         public static Dictionary<Guid, KeyPairEntityCollector> keyPairEntityCollectors = new Dictionary<Guid, KeyPairEntityCollector>();
         public static Dictionary<Guid, Dictionary<ulong, NetsEntity>> entityIdToNetsEntity = new Dictionary<Guid, Dictionary<ulong, NetsEntity>>();
@@ -811,34 +818,6 @@ namespace OdessaEngine.NETS.Core {
             instance.InternalGetAllRooms(CallBack);
         }
         /// <summary>
-        /// Create anonymous user used for NETS. Required for NETS match making. Logic will automatically store the user in player prefs and handle refreshing of auth tokens etc.
-        /// </summary>
-        /// 
-        /// <remarks>
-        /// Authenication creation for NETS.
-        /// 
-        /// Other options are
-        /// <seealso cref="NetsNetworking.CreateOrJoinRoom(string, Action{RoomState}, int)"/>
-        /// <seealso cref="NetsNetworking.CreateRoom(string, Action{RoomState}, int)"/>
-        /// <seealso cref="NetsNetworking.LeaveRoom(Guid, Action{Guid})"/>
-        /// <seealso cref="NetsNetworking.JoinRoom(string, Action{RoomState})"/>
-        /// <seealso cref="NetsNetworking.GetAllRooms(Action{List{RoomState}})"/>
-        /// </remarks>
-        /// 
-        /// <example>
-        /// CreateAnonUser(( AuthResponse ) => { UI.Instance.UserLoginSuccess(AuthResponse); });
-        /// </example>
-        /// 
-        /// <param name="CallBack">Action called upon successful completion of Method.</param>
-        /// 
-        /// <code>
-        /// CreateAnonUser(( AuthResponse ) => { UI.Instance.UserLoginSuccess(AuthResponse); });
-        /// </code>
-        /// 
-        public static void CreateAnonUser(Action<AuthResponse> CallBack = null) {
-            instance.InternalCreateAnonUser(CallBack);
-        }
-        /// <summary>
         /// Nets Matchmaking. Pass in settings, update and complete actions and it will handle match making for you.
         /// If you need meta data included see below. You can include a JSON string for objects.
         /// <code>
@@ -889,14 +868,13 @@ namespace OdessaEngine.NETS.Core {
         /// </code>
         /// 
         public static void StartMatchMaking(MatchmakerSettings Settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
-            instance.StartCoroutine(instance.InternalMatchMakingRequest(Settings, CallBackOnUpdate, CallBackOnComplete));
+            instance.StartCoroutine(instance.InternalMatchMakerRequest(Settings, CallBackOnUpdate, CallBackOnComplete));
         }
 
         protected bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
             obj = default;
             if(req.responseCode == 401) {
-                Debug.Log($"NETS refreshing token");
-                InternalRefreshToken();
+                refreshTokenAt = -1;
                 return false;
             }
             if (req.responseCode != 200) {
@@ -913,13 +891,15 @@ namespace OdessaEngine.NETS.Core {
                 return false;
             }
         }
-        protected IEnumerator InternalMatchMakerRerequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
+        protected IEnumerator InternalMatchMakerRequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
             Dictionary<string, int> regionalPings = new Dictionary<string, int>();
             regionalPings.Add("USE", 0);
             var matchMakingState = MatchMakingState.IN_QUEUE;
             MatchMakingResponse result = default;
             while (matchMakingState != MatchMakingState.IN_GAME) {
                 var requestComplete = false;
+
+                yield return EnsureAuth();
                 var toUseUrl = $"{url}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonConvert.SerializeObject(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
                 var webRequest = UnityWebRequest.Get(toUseUrl);
                 var coroutine = StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
@@ -939,61 +919,29 @@ namespace OdessaEngine.NETS.Core {
             }
             InternalJoinRoom(result.RoomState, CallBackOnComplete);
         }
-        private Coroutine matchmakingRoutine;
-        protected IEnumerator InternalMatchMakingRequest(MatchmakerSettings settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
-         
-            if (currentAuth == null) {
-                //If auth doesn't exist then 
-                InternalCreateAnonUser();
-                yield return new WaitUntil(() => currentAuth != null);
-            }
-            if (matchmakingRoutine != null) {
-                //TODO cancel matchmaking
-            }
-            matchmakingRoutine = StartCoroutine(InternalMatchMakerRerequest(settings, CallBackOnUpdate, CallBackOnComplete));
-        }
-        protected void InternalCreateAnonUser(Action<AuthResponse> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
-            StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                HandleAuthResponse(webRequest, resultText, CallBack);
-            }));
-        }
-        private Coroutine refreshRoutine;
-        protected void SetTimerToRefreshToken(AuthResponse resp) {
-            string userInfo = getUserInfoFromJWT(resp.accessToken);
-            var exp = JsonConvert.DeserializeObject<Expiry>(userInfo);
-            var timeUntilRefresh = exp.iat - exp.exp;
-            if (refreshRoutine != null)
-                StopCoroutine(refreshRoutine);
-            refreshRoutine = StartCoroutine(RefreshToken(timeUntilRefresh));
-        }
-        protected IEnumerator RefreshToken(long ttr) {
-            yield return new WaitUntil(()=> { return DateTime.UtcNow > DateTimeOffset.FromUnixTimeSeconds(ttr).UtcDateTime; });
-        }
-        private void HandleAuthResponse(UnityWebRequest webRequest, string resultText, Action<AuthResponse> CallBack = null) {
-            if (!TryGetObjectFromResponse(webRequest, resultText, out AuthResponse authResponse)) return;
+
+        private void HandleAuthResponse(UnityWebRequest webRequest, string resultText) {
+            if (!TryGetObjectFromResponse(webRequest, resultText, out AuthResponse authResponse)) throw new Exception("Unable to deserialize AuthResponse");
             currentAuth = authResponse;
-            CallBack?.Invoke(authResponse);
+
+            if (instance.settings.KeepReferenceOfAccount) {
+                PlayerPrefs.SetString(NETS_AUTH_TOKEN, JsonConvert.SerializeObject(authResponse));
+            } else {
+                PlayerPrefs.SetString(NETS_AUTH_TOKEN, default);
+            }
+
+            var tokenInfo = DecodeJwt(authResponse.accessToken);
+            var tokenLifetime = Convert.ToInt64(tokenInfo["exp"]) - Convert.ToInt64(tokenInfo["iat"]);
+            refreshTokenAt = DateTimeOffset.Now.ToUnixTimeSeconds() + tokenLifetime / 2;
+
             UserTokenResponse?.Invoke(authResponse);
         }
-        protected void InternalRefreshToken(Action<AuthResponse> CallBack = null) {
-            var webRequest = UnityWebRequest.Get($"{authUrl}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
-            StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
-                HandleAuthResponse(webRequest, resultText, CallBack);
-            }));
-        }
-        private string getUserInfoFromJWT(string jwt) {
+
+        private static Dictionary<string, string> DecodeJwt(string jwt) {
             var parts = jwt.Split('.');
-            if (parts.Length > 2) {
-                var decode = parts[1];
-                var padLength = 4 - decode.Length % 4;
-                if (padLength < 4) {
-                    decode += new string('=', padLength);
-                }
-                var bytes = Convert.FromBase64String(decode);
-                return Encoding.ASCII.GetString(bytes);
-            }
-            throw new Exception("Not a JWT");
+            if (parts.Length != 3) throw new Exception("Not a JWT");
+            return JsonConvert.DeserializeObject<Dictionary<string, string>>(Encoding.ASCII.GetString(Convert.FromBase64String(parts[1])));
+            
         }
         protected void InternalCreateRoom(string RoomName, Action<RoomState> CallBack = null, int NoPlayerTTL = 30) {
             var webRequest = UnityWebRequest.Get($"{url}/createRoom?token={settings.ApplicationGuid}&roomConfig={JsonUtility.ToJson(new RoomConfigData() { Name = RoomName, ttlNoPlayers = NoPlayerTTL })}");
@@ -1079,9 +1027,7 @@ namespace OdessaEngine.NETS.Core {
         }
 
         private IEnumerator SendOnWebRequestComplete(UnityWebRequest webRequest, Action<string> onComplete) {
-            webRequest.SendWebRequest();
-            while (!webRequest.isDone)
-                yield return new WaitForEndOfFrame();
+            yield return webRequest.SendWebRequest();
             //TODO handle errors
             onComplete?.Invoke(webRequest.downloadHandler.text);
         }
