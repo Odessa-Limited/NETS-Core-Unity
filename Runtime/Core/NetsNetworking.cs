@@ -285,6 +285,8 @@ namespace OdessaEngine.NETS.Core {
         }
 
 		public void Start() {
+            if (Application.isPlaying == false) return;
+
             if (settings.HitWorkerDirectly) {
                 StartCoroutine(connect($"{(settings.DebugWorkerUrlAndPort.Contains(":125") ? "wss" : "ws")}://{settings.DebugWorkerUrlAndPort}"));
                 StartCoroutine(WaitUntilConnected(() => {
