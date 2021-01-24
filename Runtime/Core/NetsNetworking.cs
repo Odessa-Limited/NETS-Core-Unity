@@ -95,14 +95,18 @@ namespace OdessaEngine.NETS.Core {
                 }
 
                 if (needsToken) {
-                    if (PlayerPrefs.GetString(NETS_AUTH_TOKEN, default) != default) {
+                    var cache = PlayerPrefs.GetString(NETS_AUTH_TOKEN, default);
+                    if (cache != default && cache.Length > 0) {
                         currentAuth = JsonConvert.DeserializeObject<AuthResponse>(PlayerPrefs.GetString(NETS_AUTH_TOKEN, default));
                     } else {
                         var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
                         yield return webRequest.SendWebRequest();
                         HandleAuthResponse(webRequest, webRequest.downloadHandler.text);
+                        needsRefresh = false;
                     }
-                } else if (needsRefresh) {
+                }
+                
+                if (needsRefresh) {
                     var webRequest = UnityWebRequest.Get($"{authUrl}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
 
                     yield return webRequest.SendWebRequest();
@@ -403,14 +407,14 @@ namespace OdessaEngine.NETS.Core {
                                         IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
                                         OnIsServer?.Invoke(IsServer);
                                     }
-                                    print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
+                                    if (settings.DebugConnections) print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
                                     if (recievedFirstPacket == false) {
                                         if (IsServer == false) {
                                             var startingEnts = FindObjectsOfType<NetsEntity>();
                                             var localServerEntities = startingEnts
                                                 .Where(e => e.Authority.IsServerOwned())
                                                 .ToList();
-                                            print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
+                                            if (settings.DebugConnections) print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
                                             localServerEntities.ForEach(e => {
                                                 var comp = e.GetComponent<NetsEntity>();
                                                 comp.MarkAsDestroyedByServer(); // Avoid throwing
@@ -514,8 +518,6 @@ namespace OdessaEngine.NETS.Core {
             intentionallyDisconnected = true;
             w.Close();
 
-            print("Removing objects.");
-
             foreach (var room in entityIdToNetsEntity.Keys) {
                 foreach (var e in entityIdToNetsEntity[room].Values) {
                     e.MarkAsDestroyedByServer(); // Avoid throwing
@@ -543,25 +545,24 @@ namespace OdessaEngine.NETS.Core {
                 yield break;
             }
             WebSocket conn = new WebSocket(new Uri(url));
-            print("Attempting connection to game server on " + url);
+            if (settings.DebugConnections) print("Attempting connection to game server on " + url);
 
             if (w != null || connected) {
-                print("Closing websocket");
+                if (settings.DebugConnections) print("Closing websocket");
                 conn.Close();
                 yield return new WaitForSeconds(0.02f);
             }
 
             conn = new WebSocket(new Uri(url));
 
-            print("waiting for ready");
+            if (settings.DebugConnections) print("waiting for ready");
             while (conn.isReady == false) {
                 yield return new WaitForSeconds(.03f); // Wait for iframe to postback
             }
 
-            print("attempting connect");
+            if (settings.DebugConnections) print("attempting connect");
             yield return StartCoroutine(conn.Connect());
-            if (settings.DebugConnections)
-                print("Connected to game server? " + conn.isConnected);
+            if (settings.DebugConnections) print("Connected to game server? " + conn.isConnected);
             yield return new WaitForSeconds(.2f);
 
             bool valid = true;
@@ -569,13 +570,13 @@ namespace OdessaEngine.NETS.Core {
                 yield return new WaitForSeconds(.02f);
                 valid = false;
                 if (intentionallyDisconnected) yield break;
-                print("Attempting reconnect...");
+                if (settings.DebugConnections) print("Attempting reconnect...");
                 if (!connected)
                     StartCoroutine(connect(url));
                 yield break;
             }
             if (connected) {
-                print("Too late for " + url);
+                if (settings.DebugConnections) print("Too late for " + url);
                 conn.Close(); // Too late
                 yield break;
             }
@@ -584,9 +585,7 @@ namespace OdessaEngine.NETS.Core {
             connected = true;
             keyPairEntityCollectors.Clear();
             entityIdToNetsEntity.Clear();
-            if (settings.DebugConnections)
-                print("Debug: valid: " + valid + " , connected " + connected);
-
+            if (settings.DebugConnections) print("Debug: valid: " + valid + " , connected " + connected);
 
             //listener.OnConnected();
 
