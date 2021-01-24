@@ -32,7 +32,7 @@ namespace OdessaEngine.NETS.Core {
         public static Action<RoomState> CreateRoomResponse;
         public static Action<AuthResponse> UserTokenResponse;
         public static Action<Guid> OnJoinedRoom;
-        public static Action<Guid> OnJoinedLeft;
+        public static Action<Guid> OnLeaveRoom;
         public static Action<RoomState> OnCreateRoom;
         public static Action<MatchMakingResponse> OnMatchMakingSuccess;
 
@@ -498,7 +498,7 @@ namespace OdessaEngine.NETS.Core {
                 } else if (category == (byte)WorkerToClientMessageType.LeftRoom) {
                     var roomGuid = bb.ReadGuid();
                     RoomsJoined.Remove(roomGuid);
-                    OnJoinedLeft?.Invoke(roomGuid);
+                    OnLeaveRoom?.Invoke(roomGuid);
                 } else if (category == (byte)WorkerToClientMessageType.Players) {
                     var length = bb.ReadUnsignedZeroableFibonacci();
                     var playerIds = new List<Guid>();
