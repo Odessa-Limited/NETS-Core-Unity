@@ -465,14 +465,7 @@ namespace OdessaEngine.NETS.Core {
                     //print($"Got entity change for room {roomGuid:N}");
                     try {
                         keyPairEntityCollectors[roomGuid].ApplyDelta(bb, false);
-                        if (initializedSingletons == false) {
-                            if (IsServer) {
-                                foreach (var s in typedLists.ServerSingletonsList)
-                                    if (KnownServerSingletons.ContainsKey(s.name) == false)
-                                        Instantiate(s.prefab);
-                                initializedSingletons = true;
-                            }
-                        }
+                        InitServerSingletons();
                     } catch (Exception e) {
                         Debug.LogError(e);
                     }
@@ -480,11 +473,13 @@ namespace OdessaEngine.NETS.Core {
                     var roomGuid = bb.ReadGuid();
                     var accountGuid = bb.ReadGuid();
                     var eventString = bb.ReadString();
+                    InitServerSingletons();
                 } else if (category == (byte)WorkerToClientMessageType.EntityEvent) {
                     var roomGuid = bb.ReadGuid();
                     var senderAccountGuid = bb.ReadGuid();
                     var entityId = bb.ReadUnsignedZeroableFibonacci();
                     var eventString = bb.ReadString();
+                    InitServerSingletons();
                     try {
                         if (entityIdToNetsEntity[roomGuid].TryGetValue(entityId, out var nets)) {
                             if (nets)
@@ -515,6 +510,7 @@ namespace OdessaEngine.NETS.Core {
 
         bool intentionallyDisconnected = false;
 		private void Disconnect() {
+            Debug.Log("On Disconnect from NETS");
             intentionallyDisconnected = true;
             w.Close();
 
@@ -536,8 +532,19 @@ namespace OdessaEngine.NETS.Core {
             }
 
         }
+        private void InitServerSingletons() {
+            if (initializedSingletons) return;
+            if (IsServer) {
+                foreach (var s in typedLists.ServerSingletonsList)
+                    if (KnownServerSingletons.ContainsKey(s.name) == false) {
+                        Debug.Log("Init prefab for singleton");
+                        Instantiate(s.prefab);
+                    }
+                initializedSingletons = true;
+            }
+        }
 
-		IEnumerator connect(string url) {
+        IEnumerator connect(string url) {
             intentionallyDisconnected = false;
             if (connected) {
                 if (settings.DebugConnections)

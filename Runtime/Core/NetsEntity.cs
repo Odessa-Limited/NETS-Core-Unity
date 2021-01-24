@@ -89,7 +89,6 @@ namespace OdessaEngine.NETS.Core {
                 PrefabName = prefab,
                 isNew = true,
             };
-
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
         }
         private void NetsStart() {
