@@ -144,7 +144,7 @@ namespace OdessaEngine.NETS.Core {
         }
 
         string url { get {
-#if UNITY_EDITOR
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8001";
 #endif
                 return NetsNetworkingConsts.NETS_ROOM_SERVICE_URL; 
@@ -152,7 +152,7 @@ namespace OdessaEngine.NETS.Core {
         }
         string authUrl {
             get {
-#if UNITY_EDITOR
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
                 if (settings.UseLocalConnectionInUnity) return "http://127.0.0.1:8002";
 #endif
                 return NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
@@ -460,6 +460,8 @@ namespace OdessaEngine.NETS.Core {
                     };
                     OnJoinedRoom?.Invoke(roomGuid);
                     RoomsJoined.Add(roomGuid);
+
+                    InitServerSingletons();
                 } else if (category == (byte)WorkerToClientMessageType.KeyPairEntityEvent) {
                     var roomGuid = bb.ReadGuid();
                     //print($"Got entity change for room {roomGuid:N}");
