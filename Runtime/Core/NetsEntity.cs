@@ -40,7 +40,8 @@ namespace OdessaEngine.NETS.Core {
         protected bool destroyedByServer = false;
         public bool hasStarted = false;
 
-
+        private static bool IsNetsNativeType(Type t) => TypedField.SyncableTypeLookup.ContainsKey(t) || new[] { typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(t);
+        
         private static PropertyInfo[] GetValidPropertiesFor(Type t, bool isTopLevel) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Where(p => p.GetAccessors().Length == 2)
@@ -60,7 +61,15 @@ namespace OdessaEngine.NETS.Core {
                 nameof(Rigidbody2D.angularDrag)
             }.Contains(p.Name))
 
-            .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(p.PropertyType))
+            .Where(p => t != typeof(SpriteRenderer) || new string[] {
+                nameof(SpriteRenderer.color),
+                nameof(SpriteRenderer.size),
+                nameof(SpriteRenderer.flipY),
+                nameof(SpriteRenderer.flipX),
+            }.Contains(p.Name))
+
+            /* Checking to ensure we had a conversion type for it
+             * .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(p.PropertyType))*/
             .ToArray();
         public enum NetsEntityState {
             Uninitialized,
@@ -237,10 +246,14 @@ namespace OdessaEngine.NETS.Core {
                                 continue;
                             }
                             var objectToSave = objProp.Value();
-                            if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
-                            if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
-                            if (objectToSave is Quaternion v4) objectToSave = new System.Numerics.Vector4(v4.x, v4.y, v4.z,v4.w);
-                            localModel.SetObject(f.PathName, objectToSave);
+                            if (IsNetsNativeType(objectToSave.GetType())) {
+                                if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
+                                if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
+                                if (objectToSave is Quaternion v4) objectToSave = new System.Numerics.Vector4(v4.x, v4.y, v4.z,v4.w);
+                                localModel.SetObject(f.PathName, objectToSave);
+                            } else {
+                                localModel.SetJson(f.PathName, JsonConvert.SerializeObject(objectToSave));
+                            }
                         }
 
                     }
@@ -267,6 +280,9 @@ namespace OdessaEngine.NETS.Core {
                     if (obj is System.Numerics.Vector2 v2) obj = v2.ToUnityVector2();
                     if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
                     if (obj is System.Numerics.Vector4 v4) obj = v4.ToUnityQuaternion();
+                    if (!IsNetsNativeType(objProp.Method.PropertyType)) {
+                        obj = JsonConvert.DeserializeObject((string)obj, objProp.Method.PropertyType); 
+                    }
 
                     // Check lerps
                     if (objProp.Field.LerpType != LerpType.None) {
