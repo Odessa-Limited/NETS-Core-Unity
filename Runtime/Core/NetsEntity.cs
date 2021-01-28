@@ -413,6 +413,8 @@ namespace OdessaEngine.NETS.Core {
                 return;
             }
             if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab || PrefabStageUtility.GetCurrentPrefabStage() != null || !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(gameObject)) || !string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this))) {
+                Id = 0;
+
                 var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
                 if (string.IsNullOrEmpty(longPath))
                     longPath = PrefabStageUtility.GetCurrentPrefabStage().assetPath;

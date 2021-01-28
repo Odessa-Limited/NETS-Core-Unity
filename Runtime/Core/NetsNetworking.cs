@@ -36,29 +36,10 @@ namespace OdessaEngine.NETS.Core {
         public static Action<RoomState> OnCreateRoom;
         public static Action<MatchMakingResponse> OnMatchMakingSuccess;
 
-        public static Action<List<Guid>> OnPlayersInRoomChange;
-        public static Action<List<Guid>> OnPlayersInRoomLeft;
-        public static Action<List<Guid>> OnPlayersInRoomJoined;
-        private static List<Guid> _PlayersInRoom = new List<Guid>();
-        public static List<Guid> PlayersInRoom {
-            get { return _PlayersInRoom; }
-            set {
-                var unchanged = _PlayersInRoom.Intersect(value);
-                var left = _PlayersInRoom.Except(unchanged).ToList();
-                var joined = value.Except(unchanged).ToList();
-                OnPlayersInRoomLeft?.Invoke(left.ToList());
-                OnPlayersInRoomJoined?.Invoke(joined.ToList());
-                _PlayersInRoom = value;
-                OnPlayersInRoomChange?.Invoke(value);
-            }
-        }
-        private static MatchMakingResponse _CurrentMatchMaking = null;
-        public static MatchMakingResponse CurrentMatchMaking {
-            get { return _CurrentMatchMaking; }
-            set {
-                _CurrentMatchMaking = value;
-            }
-        }
+        public static Action<Guid> OnPlayersInRoomLeft;
+        public static Action<Guid> OnPlayersInRoomJoined;
+
+        public static MatchMakingResponse CurrentMatchMaking { get; set; } = null;
         public static List<Guid> RoomsJoined = new List<Guid>();
 
         [Range(0, 500)]
@@ -228,7 +209,19 @@ namespace OdessaEngine.NETS.Core {
             }));
             return true;
         }
+        private IEnumerator DelayPing(Guid requestId) {
+            yield return new WaitForSeconds(1);
+            w.Send(BitUtils.ArrayFromStream(bos => {
+                bos.WriteByte((byte)ClientToWorkerMessageType.Pong);
+                bos.WriteGuid(requestId);
+            }));
+        }
         public void SendPong(Guid requestId) {
+            /*
+#if DEVELOPMENT_BUILD && !UNITY_EDITOR
+            StartCoroutine(DelayPing(requestId));
+            return;
+#endif*/
 #if UNITY_EDITOR
             if (Application.isPlaying == false) return;
 #endif
@@ -327,7 +320,7 @@ namespace OdessaEngine.NETS.Core {
         public static Dictionary<Guid, Dictionary<ulong, NetsEntity>> entityIdToNetsEntity = new Dictionary<Guid, Dictionary<ulong, NetsEntity>>();
 
         bool initializedSingletons = false;
-        bool recievedFirstPacket = false;
+        bool HasJoinedRoom = false;
         IEnumerator HandlePacketWithDelay(byte[] data) {
             if (DebugLatency > 0) yield return new WaitForSeconds(DebugLatency/1000f);
             HandlePacket(data);
@@ -351,7 +344,7 @@ namespace OdessaEngine.NETS.Core {
                     entityIdToNetsEntity[roomGuid] = new Dictionary<ulong, NetsEntity>();
                     keyPairEntityCollectors[roomGuid].AfterEntityCreated = (entity) => {
                         try {
-                            //print($"room: {roomGuid:N} created entity {entity.Id}: {entity.PrefabName}");
+                            if (settings.DebugConnections) print($"Created entity {entity.Id}: {entity.PrefabName}");
                             if (entity.Fields.ContainsKey(CreationGuidFieldName)) {
 
                                 var guid = Guid.ParseExact(entity.GetString(CreationGuidFieldName), "N");
@@ -384,6 +377,9 @@ namespace OdessaEngine.NETS.Core {
                             entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
                             component.OnCreatedOnServer(roomGuid, entity);
                             newGo.SetActive(true);
+                            if (entity.PrefabName == "?ClientConnection") {
+                                OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"));
+                            }
                         } catch (Exception e) {
                             Debug.LogWarning(e);
                         }
@@ -391,8 +387,26 @@ namespace OdessaEngine.NETS.Core {
                     };
                     keyPairEntityCollectors[roomGuid].AfterEntityUpdated = async (entity) => {
                         try {
-                            //print("AfterEntityUpdated");
-                            //print($"room: {roomGuid:N} updated entity {entity.Id}");
+                            //if (settings.DebugConnections) print($"After updated entity {entity.Id}");
+                            await Task.CompletedTask;
+                        } catch (Exception e) {
+                            Debug.LogError(e);
+                        }
+                    };
+                    keyPairEntityCollectors[roomGuid].AfterChangeStreamApplied = async () => {
+                        try {
+                            if (IsServer && !initializedSingletons) {
+                                foreach (var s in typedLists.ServerSingletonsList)
+                                    if (KnownServerSingletons.ContainsKey(s.name) == false) {
+                                        Debug.Log("Init prefab for singleton");
+                                        Instantiate(s.prefab);
+                                    }
+                                initializedSingletons = true;
+                            }
+                            if (HasJoinedRoom == false) {
+                                OnJoinedRoom?.Invoke(roomGuid);
+                                HasJoinedRoom = true;
+                            }
                             await Task.CompletedTask;
                         } catch (Exception e) {
                             Debug.LogError(e);
@@ -402,43 +416,40 @@ namespace OdessaEngine.NETS.Core {
                         try {
                             //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                             if (entity.Id == 1) {
-                                if (entity.PrefabName == "Room") {
-                                    if (entity.GetString("ServerAccount")?.Length == 32) {
-                                        IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
-                                        OnIsServer?.Invoke(IsServer);
-                                    }
+                                if (entity.PrefabName != "?Room") throw new Exception("Expected room as entity ID 1");
+                                if (field.Name == "ServerAccount") {
+                                    IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
                                     if (settings.DebugConnections) print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
-                                    if (recievedFirstPacket == false) {
-                                        if (IsServer == false) {
-                                            var startingEnts = FindObjectsOfType<NetsEntity>();
-                                            var localServerEntities = startingEnts
-                                                .Where(e => e.Authority.IsServerOwned())
-                                                .ToList();
-                                            if (settings.DebugConnections) print($"Found {localServerEntities.Count} server entities to destroy as we are not server");
-                                            localServerEntities.ForEach(e => {
-                                                var comp = e.GetComponent<NetsEntity>();
-                                                comp.MarkAsDestroyedByServer(); // Avoid throwing
-                                                KnownServerSingletons.Remove(comp.prefab);
-                                                Destroy(e.gameObject);
-                                            });
-                                        }
-                                        recievedFirstPacket = true;
-                                    }
 
-                                } else {
-                                    throw new Exception("Expected room as entity ID 1");
+                                    if (IsServer == false) {
+                                        var startingEnts = FindObjectsOfType<NetsEntity>();
+                                        var localServerEntities = startingEnts
+                                            .Where(e => e.Authority.IsServerOwned() && e.Id == 0)
+                                            .ToList();
+                                        if (settings.DebugConnections) {
+                                            print($"Found {localServerEntities.Count} server entities to destroy as we are not server. {string.Join(",", localServerEntities.Select(e => e.prefab))}");
+                                        }
+                                        localServerEntities.ForEach(e => {
+                                            var comp = e.GetComponent<NetsEntity>();
+                                            comp.MarkAsDestroyedByServer(); // Avoid throwing
+                                            KnownServerSingletons.Remove(comp.prefab);
+                                            Destroy(e.gameObject);
+                                        });
+                                    }
+                                    OnIsServer?.Invoke(IsServer);
                                 }
                                 return;
                             }
-
-                            if (entityIdToNetsEntity.TryGetValue(roomGuid, out var roomDict)) {
-                                if (roomDict.TryGetValue(entity.Id, out var e)) {
-                                    e.OnFieldChange(entity, field.Name);
+                            if (entity.PrefabName.StartsWith("?") == false) {
+                                if (entityIdToNetsEntity.TryGetValue(roomGuid, out var roomDict)) {
+                                    if (roomDict.TryGetValue(entity.Id, out var e)) {
+                                        e.OnFieldChange(entity, field.Name);
+                                    } else {
+                                        print("Unknown id: " + entity.Id);
+                                    }
                                 } else {
-                                    print("Unknown id: " + entity.Id);
+                                    print("Unknown room: " + roomGuid);
                                 }
-                            } else {
-                                print("Unknown room: " + roomGuid);
                             }
                             await Task.CompletedTask;
                         } catch (Exception e) {
@@ -447,27 +458,27 @@ namespace OdessaEngine.NETS.Core {
                     };
                     keyPairEntityCollectors[roomGuid].AfterEntityRemoved = async (entity) => {
                         try {
-                            //print($"Removed {entity.Id}.{entity.PrefabName}");
+                            if (settings.DebugConnections) print($"Removed {entity.Id} {entity.PrefabName}");
                             if (entityIdToNetsEntity[roomGuid].TryGetValue(entity.Id, out var e) && e != null && e.gameObject != null) {
                                 e.MarkAsDestroyedByServer();
                                 Destroy(e.gameObject);
                             }
                             entityIdToNetsEntity[roomGuid].Remove(entity.Id);
+                            if (entity.PrefabName == "?ClientConnection") {
+                                OnPlayersInRoomLeft?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"));
+                            }
                             await Task.CompletedTask;
                         } catch (Exception e) {
                             Debug.LogError(e);
                         }
                     };
-                    OnJoinedRoom?.Invoke(roomGuid);
                     RoomsJoined.Add(roomGuid);
 
-                    InitServerSingletons();
                 } else if (category == (byte)WorkerToClientMessageType.KeyPairEntityEvent) {
                     var roomGuid = bb.ReadGuid();
                     //print($"Got entity change for room {roomGuid:N}");
                     try {
                         keyPairEntityCollectors[roomGuid].ApplyDelta(bb, false);
-                        InitServerSingletons();
                     } catch (Exception e) {
                         Debug.LogError(e);
                     }
@@ -475,13 +486,11 @@ namespace OdessaEngine.NETS.Core {
                     var roomGuid = bb.ReadGuid();
                     var accountGuid = bb.ReadGuid();
                     var eventString = bb.ReadString();
-                    InitServerSingletons();
                 } else if (category == (byte)WorkerToClientMessageType.EntityEvent) {
                     var roomGuid = bb.ReadGuid();
                     var senderAccountGuid = bb.ReadGuid();
                     var entityId = bb.ReadUnsignedZeroableFibonacci();
                     var eventString = bb.ReadString();
-                    InitServerSingletons();
                     try {
                         if (entityIdToNetsEntity[roomGuid].TryGetValue(entityId, out var nets)) {
                             if (nets)
@@ -496,19 +505,18 @@ namespace OdessaEngine.NETS.Core {
                     var roomGuid = bb.ReadGuid();
                     RoomsJoined.Remove(roomGuid);
                     OnLeaveRoom?.Invoke(roomGuid);
-                } else if (category == (byte)WorkerToClientMessageType.Players) {
-                    var length = bb.ReadUnsignedZeroableFibonacci();
-                    var playerIds = new List<Guid>();
-                    for (ulong i = 0; i < length; i++) {
-                        playerIds.Add(bb.ReadGuid());
-                    }
-                    PlayersInRoom = playerIds;
                 }
             } catch (Exception e) {
                 OnConnect?.Invoke(false);
                 Debug.LogError(e);
             }
         }
+
+        public static List<Guid> PlayersInRoom () => keyPairEntityCollectors[RoomsJoined[0]].knownEntities
+                                                        .Where(o=>o.Value.PrefabName == "?ClientConnection")
+                                                        .Select(e => Guid.ParseExact(e.Value.GetString("AccountGuid"),"N"))
+                                                        .ToList();
+        
 
         bool intentionallyDisconnected = false;
 		private void Disconnect() {
@@ -534,18 +542,6 @@ namespace OdessaEngine.NETS.Core {
             }
 
         }
-        private void InitServerSingletons() {
-            if (initializedSingletons) return;
-            if (IsServer) {
-                foreach (var s in typedLists.ServerSingletonsList)
-                    if (KnownServerSingletons.ContainsKey(s.name) == false) {
-                        Debug.Log("Init prefab for singleton");
-                        Instantiate(s.prefab);
-                    }
-                initializedSingletons = true;
-            }
-        }
-
         IEnumerator connect(string url) {
             intentionallyDisconnected = false;
             if (connected) {
@@ -597,9 +593,8 @@ namespace OdessaEngine.NETS.Core {
             if (settings.DebugConnections) print("Debug: valid: " + valid + " , connected " + connected);
 
             //listener.OnConnected();
-
+            HasJoinedRoom = false;
             initializedSingletons = false;
-            recievedFirstPacket = false;
             while (valid) {
                 if (!w.isConnected) {
                     if (!intentionallyDisconnected) print("ws error!");
