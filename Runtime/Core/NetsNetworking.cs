@@ -36,8 +36,8 @@ namespace OdessaEngine.NETS.Core {
         public static Action<RoomState> OnCreateRoom;
         public static Action<MatchMakingResponse> OnMatchMakingSuccess;
 
-        public static Action<Guid> OnPlayersInRoomLeft;
-        public static Action<Guid> OnPlayersInRoomJoined;
+        public static Action<Guid,int> OnPlayersInRoomLeft;
+        public static Action<Guid,int> OnPlayersInRoomJoined;
 
         public static MatchMakingResponse CurrentMatchMaking { get; set; } = null;
         public static List<Guid> RoomsJoined = new List<Guid>();
@@ -168,7 +168,7 @@ namespace OdessaEngine.NETS.Core {
         //public bool showPlaceholderPrefabs = false;
 
         public bool IsServer = false;
-        public static Guid? myAccountGuid;
+        public static Guid? myAccountGuid { get; set; } = null;
         public static Guid? currentRoom = null;
 
         WebSocket w;
@@ -356,6 +356,10 @@ namespace OdessaEngine.NETS.Core {
                                 }
                             }
 
+                            if (entity.PrefabName == "?ClientConnection") {
+                                Debug.Log($"?ClientConnection created AccountGuid: {myAccountGuid} .ClientConnection guid:{ entity.GetString("AccountGuid") }");
+                                OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), PlayersInRoom().Count);
+                            }
                             NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
                             if (typeToCreate == null) {
                                 print("Unable to find object " + entity.Id + " " + entity.PrefabName);
@@ -377,9 +381,6 @@ namespace OdessaEngine.NETS.Core {
                             entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
                             component.OnCreatedOnServer(roomGuid, entity);
                             newGo.SetActive(true);
-                            if (entity.PrefabName == "?ClientConnection") {
-                                OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"));
-                            }
                         } catch (Exception e) {
                             Debug.LogWarning(e);
                         }
@@ -465,7 +466,7 @@ namespace OdessaEngine.NETS.Core {
                             }
                             entityIdToNetsEntity[roomGuid].Remove(entity.Id);
                             if (entity.PrefabName == "?ClientConnection") {
-                                OnPlayersInRoomLeft?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"));
+                                OnPlayersInRoomLeft?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), PlayersInRoom().Count);
                             }
                             await Task.CompletedTask;
                         } catch (Exception e) {
