@@ -33,6 +33,7 @@ namespace OdessaEngine.NETS.Core {
         public static void OnRuntimeMethodLoad() {
 #if UNITY_EDITOR
             if (Application.isPlaying) return;
+            Debug.Log("NETS - Rebuild prefab defintions");
             var lists = GetTypedList();
             lists.NetworkedTypesList = new List<NetworkObjectConfig>();
             lists.ServerSingletonsList = new List<NetworkObjectConfig>();
@@ -60,7 +61,7 @@ namespace OdessaEngine.NETS.Core {
                 }
                 var networkedComponent = networkedComponentList.Single();
                 networkedComponent.SyncProperties();
-                EditorUtility.SetDirty(networkedComponent);
+                EditorUtility.SetDirty(networkedComponent.gameObject);
                 //if (networkedComponent.GetType().Name != asGo.name) throw new Exception("Name mismatch - Gameobject " + asGo.name + " has networked class " + networkedComponent.GetType().Name);
                 if (lists.NetworkedTypesList.Any(n => n.name == networkedComponent.GetType().Name)) continue;
                 networkedComponent.prefab = asGo.name;
