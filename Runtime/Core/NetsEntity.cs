@@ -12,6 +12,7 @@ using static OdessaEngine.NETS.Core.NetsNetworking;
 using WebSocketSharp;
 
 #if UNITY_EDITOR
+using UnityEditor.SceneManagement;
 using UnityEditor.Experimental.SceneManagement;
 using UnityEditor;
 #endif
@@ -25,6 +26,8 @@ namespace OdessaEngine.NETS.Core {
         [Header("Sync properties")]
         [Range(0.0f, 20.0f)]
         public float SyncFramesPerSecond = 1f;
+        [SerializeField]
+        public string assignedGuid = new Guid().ToString("N");
 
         public enum AuthorityEnum {
             Client,
@@ -35,10 +38,10 @@ namespace OdessaEngine.NETS.Core {
 
         public ulong Id;
         public Guid roomGuid;
-        public Guid? creationGuid;
         NetsEntityState state;
         protected bool destroyedByServer = false;
         public bool hasStarted = false;
+        public bool attemptedToCreateOnServer = false;
 
         private static bool IsNetsNativeType(Type t) => TypedField.SyncableTypeLookup.ContainsKey(t) || new[] { typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(t);
         
@@ -98,6 +101,7 @@ namespace OdessaEngine.NETS.Core {
                 PrefabName = prefab,
                 isNew = true,
             };
+            if(Authority == AuthorityEnum.Client) assignedGuid = Guid.NewGuid().ToString("N");
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
         }
         private void NetsStart() {
@@ -113,13 +117,16 @@ namespace OdessaEngine.NETS.Core {
             if (NetsNetworking.instance?.canSend != true) return;
             if (destroyedByServer) return;
             if (state != NetsEntityState.Uninitialized) return;
-            if (creationGuid == null) {
-                creationGuid = Guid.NewGuid();
-                localModel.SetString(NetsNetworking.CreationGuidFieldName, creationGuid.Value.ToString("N"));
-                NetsEntityByCreationGuidMap.Add(creationGuid.Value, this);
+            if (assignedGuid == new Guid().ToString("N")) {
+                assignedGuid = Guid.NewGuid().ToString("N");
+            }
+            if (attemptedToCreateOnServer == false) { 
+                localModel.SetString(NetsNetworking.AssignedGuidFieldName, assignedGuid);
+                NetsEntityByCreationGuidMap.Add(Guid.ParseExact(assignedGuid,"N"), this);
                 SetPropertiesBeforeCreation = true;
                 LateUpdate();
                 SetPropertiesBeforeCreation = false;
+                attemptedToCreateOnServer = true;
             }
             if (NetsNetworking.instance?.CreateFromGameObject(this) == true) {
                 //print("Asked server to create " + prefab);
@@ -272,7 +279,7 @@ namespace OdessaEngine.NETS.Core {
                 if (key.StartsWith(".")) {
                     var objProp = GetPropertyAtPath(key);
                     if (objProp == null) {
-                        if (key != NetsNetworking.CreationGuidFieldName) Debug.Log("Unable to find path: " + key);
+                        if (key != NetsNetworking.AssignedGuidFieldName) Debug.Log("Unable to find path: " + key);
                         return;
                     }
 
@@ -338,6 +345,15 @@ namespace OdessaEngine.NETS.Core {
         bool lastOwnState = false;
         bool ownershipSwitch = false;
         void Update() {
+#if UNITY_EDITOR
+            if (GetIsPrefab(gameObject) == false && assignedGuid == new Guid().ToString("N")) {
+                assignedGuid = Guid.NewGuid().ToString("N"); 
+                PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                EditorSceneManager.MarkSceneDirty(gameObject.scene); 
+                EditorUtility.SetDirty(gameObject);
+            }
+            if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
+#endif
             ownershipSwitch = lastOwnState != OwnedByMe;
             lastOwnState = OwnedByMe;
             if (Application.isPlaying) {
@@ -524,10 +540,10 @@ namespace OdessaEngine.NETS.Core {
             if (methodToIdLookup.TryGetValue(method, out var index)) {
                 if (Id == 0) {
                     TryCreateOnServer();
-                    if (!creationGuid.HasValue)
+                    if (assignedGuid == default)
                         throw new Exception($"No creation Guid for NETS Entity Name: {method.DeclaringType.Name}.{method.Name}");
                     try {
-                        NetsNetworking.instance.SendEntityEventByCreationGuid(roomGuid, creationGuid.Value, JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
+                        NetsNetworking.instance.SendEntityEventByCreationGuid(roomGuid, Guid.ParseExact(assignedGuid,"N"), JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
                     } catch (Exception e) {
                         Debug.LogError(e);
                     }
@@ -550,6 +566,9 @@ namespace OdessaEngine.NETS.Core {
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10 });
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
 
+        public static bool GetIsPrefab(GameObject obj) {
+            return obj.scene.rootCount == 0;
+        }
     }
 
     [Serializable]

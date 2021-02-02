@@ -179,7 +179,7 @@ namespace OdessaEngine.NETS.Core {
 
         bool oldConnected = false;
 
-        public const string CreationGuidFieldName = ".CreationGuid";
+        public const string AssignedGuidFieldName = ".AssignedGuid";
         public static Dictionary<string, NetsEntity> KnownServerSingletons = new Dictionary<string, NetsEntity>();
 
         public bool CreateFromGameObject(NetsEntity entity) {
@@ -345,9 +345,9 @@ namespace OdessaEngine.NETS.Core {
                     keyPairEntityCollectors[roomGuid].AfterEntityCreated = (entity) => {
                         try {
                             if (settings.DebugConnections) print($"Created entity {entity.Id}: {entity.PrefabName}");
-                            if (entity.Fields.ContainsKey(CreationGuidFieldName)) {
+                            if (entity.Fields.ContainsKey(AssignedGuidFieldName)) {
 
-                                var guid = Guid.ParseExact(entity.GetString(CreationGuidFieldName), "N");
+                                var guid = Guid.ParseExact(entity.GetString(AssignedGuidFieldName), "N");
                                 NetsEntity.NetsEntityByCreationGuidMap.TryGetValue(guid, out var matchedEntity);
                                 if (matchedEntity != null) {
                                     entityIdToNetsEntity[roomGuid].Add(entity.Id, matchedEntity);
