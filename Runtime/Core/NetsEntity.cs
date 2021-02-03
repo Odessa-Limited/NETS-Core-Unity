@@ -187,7 +187,10 @@ namespace OdessaEngine.NETS.Core {
             if (Application.isPlaying == false) return;
 #endif
 
-            if (OwnedByMe == false && destroyedByServer == false) throw new Exception($"Destroyed entity {prefab} without authority to do so");
+            if (OwnedByMe == false && destroyedByServer == false) {
+                Debug.LogWarning($"Destroyed entity {prefab} without authority to do so");
+                return;
+            }
             if (destroyedByServer == false) {
                 NetsNetworking.instance?.DestroyEntity(Id);
             }
@@ -233,7 +236,21 @@ namespace OdessaEngine.NETS.Core {
 
         float lastUpdateTime = 0f;
         bool SetPropertiesBeforeCreation = false;
+        bool lastOwnershipState = default;
         public void LateUpdate() {
+            if (lastOwnershipState == default) { 
+                if(OwnedByMe)
+                    foreach (var c in transform.GetComponentsInChildren<NetsBehavior>()) 
+                        c.NetsOnGainOwnership();
+            }
+            if(lastOwnershipState != OwnedByMe) {
+                foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
+                    if (OwnedByMe)
+                        c.NetsOnGainOwnership();
+                    else
+                        c.NetsOnLostOwnership();
+            }
+            lastOwnershipState = OwnedByMe;
 
             if (SetPropertiesBeforeCreation == false) {
                 if (state != NetsEntityState.Insync) return;
@@ -346,13 +363,16 @@ namespace OdessaEngine.NETS.Core {
         bool ownershipSwitch = false;
         void Update() {
 #if UNITY_EDITOR
-            if (GetIsPrefab(gameObject) == false && assignedGuid == new Guid().ToString("N")) {
-                assignedGuid = Guid.NewGuid().ToString("N"); 
-                PrefabUtility.RecordPrefabInstancePropertyModifications(this);
-                EditorSceneManager.MarkSceneDirty(gameObject.scene); 
-                EditorUtility.SetDirty(gameObject);
+
+            if (Application.isPlaying == false) {
+                if (GetIsPrefab(gameObject) == false && assignedGuid == new Guid().ToString("N")) {
+                    assignedGuid = Guid.NewGuid().ToString("N");
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                    EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                    EditorUtility.SetDirty(gameObject);
+                }
+                if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
             }
-            if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
 #endif
             ownershipSwitch = lastOwnState != OwnedByMe;
             lastOwnState = OwnedByMe;

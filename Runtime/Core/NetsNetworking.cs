@@ -513,10 +513,14 @@ namespace OdessaEngine.NETS.Core {
             }
         }
 
-        public static List<Guid> PlayersInRoom () => keyPairEntityCollectors[RoomsJoined[0]].knownEntities
-                                                        .Where(o=>o.Value.PrefabName == "?ClientConnection")
-                                                        .Select(e => Guid.ParseExact(e.Value.GetString("AccountGuid"),"N"))
-                                                        .ToList();
+        public static List<Guid> PlayersInRoom() {
+            if(RoomsJoined.Count > 0 && keyPairEntityCollectors.ContainsKey(RoomsJoined[0]))
+                return keyPairEntityCollectors[RoomsJoined[0]].knownEntities
+                    .Where(o => o.Value.PrefabName == "?ClientConnection")
+                    .Select(e => Guid.ParseExact(e.Value.GetString("AccountGuid"), "N"))
+                    .ToList();
+            return new List<Guid>();
+        }
         
 
         bool intentionallyDisconnected = false;
@@ -529,7 +533,8 @@ namespace OdessaEngine.NETS.Core {
                 foreach (var e in entityIdToNetsEntity[room].Values) {
                     e.MarkAsDestroyedByServer(); // Avoid throwing
                     KnownServerSingletons.Remove(e.prefab);
-                    Destroy(e.gameObject);
+                    if(e && e.gameObject)
+                        Destroy(e.gameObject);
                 }
             }
             entityIdToNetsEntity.Clear();

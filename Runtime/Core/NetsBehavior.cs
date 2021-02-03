@@ -54,5 +54,7 @@ namespace OdessaEngine.NETS.Core {
         public virtual void NetsOwnedAwake() { }
         public virtual void NetsOwnedStart() { }
         public virtual void NetsOwnedUpdate() { }
+        public virtual void NetsOnGainOwnership() { }
+        public virtual void NetsOnLostOwnership() { }
     }
 }
