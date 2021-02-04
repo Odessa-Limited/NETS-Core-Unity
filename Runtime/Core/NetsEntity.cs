@@ -186,7 +186,6 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
             if (Application.isPlaying == false) return;
 #endif
-
             if (OwnedByMe == false && destroyedByServer == false) {
                 Debug.LogWarning($"Destroyed entity {prefab} without authority to do so");
                 return;

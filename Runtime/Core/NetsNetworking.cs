@@ -338,6 +338,8 @@ namespace OdessaEngine.NETS.Core {
                     SendPong(requestId);
                 } else if (category == (byte)WorkerToClientMessageType.JoinedRoom) {
                     var roomGuid = bb.ReadGuid();
+                    if (settings.DebugConnections)
+                        Debug.Log($"NETS - Joined Room ID {roomGuid}");
                     myAccountGuid = bb.ReadGuid();
                     currentRoom = roomGuid;
                     keyPairEntityCollectors[roomGuid] = new KeyPairEntityCollector();
@@ -503,9 +505,6 @@ namespace OdessaEngine.NETS.Core {
                         Debug.LogError(e);
                     }
                 } else if (category == (byte)WorkerToClientMessageType.LeftRoom) {
-                    var roomGuid = bb.ReadGuid();
-                    RoomsJoined.Remove(roomGuid);
-                    OnLeaveRoom?.Invoke(roomGuid);
                 }
             } catch (Exception e) {
                 OnConnect?.Invoke(false);
@@ -525,7 +524,7 @@ namespace OdessaEngine.NETS.Core {
 
         bool intentionallyDisconnected = false;
 		private void Disconnect() {
-            Debug.Log("On Disconnect from NETS");
+            Debug.Log("On Disconnect from NETS"); 
             intentionallyDisconnected = true;
             w.Close();
 
@@ -537,15 +536,21 @@ namespace OdessaEngine.NETS.Core {
                         Destroy(e.gameObject);
                 }
             }
+            NetsEntity.NetsEntityByCreationGuidMap.Clear();
             entityIdToNetsEntity.Clear();
             keyPairEntityCollectors.Clear();
             KnownServerSingletons.Clear();
 
-            // The previous code doesn't work for some reason... :suspicious:
             foreach (var e in FindObjectsOfType<NetsEntity>()) {
                 e.MarkAsDestroyedByServer(); // Avoid throwing
                 Destroy(e.gameObject);
             }
+            if (RoomsJoined.Count > 0) {
+                var roomGuid = RoomsJoined[0];
+                RoomsJoined.Remove(roomGuid);
+                OnLeaveRoom?.Invoke(roomGuid);
+            }
+            CurrentMatchMaking = null;
 
         }
         IEnumerator connect(string url) {
