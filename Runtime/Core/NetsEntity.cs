@@ -586,7 +586,7 @@ namespace OdessaEngine.NETS.Core {
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
 
         public static bool GetIsPrefab(GameObject obj) {
-            return obj.scene.rootCount == 0;
+            return PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.Regular;
         }
     }
 
