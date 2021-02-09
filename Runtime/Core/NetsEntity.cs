@@ -589,17 +589,29 @@ namespace OdessaEngine.NETS.Core {
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
 
         public static bool GetIsPrefab(GameObject obj) {
+#if UNITY_EDITOR
             return !(PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.MissingAsset || PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.NotAPrefab);
+#endif
+            return false;
         }
         public static bool IsInPrefabMode(GameObject obj) {
+#if UNITY_EDITOR
             return PrefabStageUtility.GetCurrentPrefabStage()?.scene == SceneManager.GetActiveScene();
+#endif
+            return false;
         }
         public static bool AmInPrefabInstanceContext(GameObject obj) {
+#if UNITY_EDITOR
             var mode = PrefabStageUtility.GetPrefabStage(obj)?.mode;
             return mode == PrefabStage.Mode.InContext;
+#endif
+            return false;
         }
         public static bool AmInPrefabIsolationContent(GameObject obj) {
+#if UNITY_EDITOR
             return PrefabStageUtility.GetPrefabStage(obj)?.mode == PrefabStage.Mode.InIsolation;
+#endif
+            return false;
         }
     }
 
