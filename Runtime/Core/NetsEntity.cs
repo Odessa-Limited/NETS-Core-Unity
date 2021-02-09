@@ -363,17 +363,17 @@ namespace OdessaEngine.NETS.Core {
         bool ownershipSwitch = false;
         void Update() {
 #if UNITY_EDITOR
-
             if (Application.isPlaying == false) {
-                if (GetIsPrefab(gameObject) == false) {
-                    if ((Selection.Contains (gameObject)|| AmInPrefabInstanceContext(gameObject)) && assignedGuid == new Guid().ToString("N")) {
-                        assignedGuid = Guid.NewGuid().ToString("N");
-                        PrefabUtility.RecordPrefabInstancePropertyModifications(this);
-                        EditorSceneManager.MarkSceneDirty(gameObject.scene);
-                        EditorUtility.SetDirty(gameObject);
-                    } else {
-                        assignedGuid = new Guid().ToString("N");
-                    }
+                if (GetIsPrefab(gameObject) && assignedGuid == new Guid().ToString("N")) {
+                    assignedGuid = Guid.NewGuid().ToString("N");
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                    EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                    EditorUtility.SetDirty(gameObject);
+                } else if (AmInPrefabIsolationContent(gameObject) && assignedGuid != new Guid().ToString("N")) {
+                    assignedGuid = new Guid().ToString("N");
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                    EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                    EditorUtility.SetDirty(gameObject);
                 }
             }
 #endif
@@ -589,16 +589,17 @@ namespace OdessaEngine.NETS.Core {
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
 
         public static bool GetIsPrefab(GameObject obj) {
-            return PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.Regular;
+            return !(PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.MissingAsset || PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.NotAPrefab);
         }
         public static bool IsInPrefabMode(GameObject obj) {
             return PrefabStageUtility.GetCurrentPrefabStage()?.scene == SceneManager.GetActiveScene();
         }
         public static bool AmInPrefabInstanceContext(GameObject obj) {
-            return PrefabStageUtility.GetPrefabStage(obj).mode == PrefabStage.Mode.InContext;
+            var mode = PrefabStageUtility.GetPrefabStage(obj)?.mode;
+            return mode == PrefabStage.Mode.InContext;
         }
         public static bool AmInPrefabIsolationContent(GameObject obj) {
-            return PrefabStageUtility.GetPrefabStage(obj).mode == PrefabStage.Mode.InIsolation;
+            return PrefabStageUtility.GetPrefabStage(obj)?.mode == PrefabStage.Mode.InIsolation;
         }
     }
 
