@@ -365,14 +365,17 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
 
             if (Application.isPlaying == false) {
-                if (GetIsPrefab(gameObject) == false && assignedGuid == new Guid().ToString("N")) {
-                    assignedGuid = Guid.NewGuid().ToString("N");
-                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
-                    EditorSceneManager.MarkSceneDirty(gameObject.scene);
-                    EditorUtility.SetDirty(gameObject);
+                if (GetIsPrefab(gameObject) == false) {
+                    if (AmInPrefabIsolationContent(gameObject)) {
+                        assignedGuid = new Guid().ToString("N");
+                    }
+                    if (AmInPrefabInstanceContext(gameObject) && assignedGuid == new Guid().ToString("N")) {
+                        assignedGuid = Guid.NewGuid().ToString("N");
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                        EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                        EditorUtility.SetDirty(gameObject);
+                    }
                 }
-                if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
-                if (PrefabUtility.IsPartOfPrefabInstance(gameObject) == false) assignedGuid = new Guid().ToString("N");
             }
 #endif
             ownershipSwitch = lastOwnState != OwnedByMe;
@@ -592,9 +595,15 @@ namespace OdessaEngine.NETS.Core {
         public static bool IsInPrefabMode(GameObject obj) {
             return PrefabStageUtility.GetCurrentPrefabStage()?.scene == SceneManager.GetActiveScene();
         }
+        public static bool AmInPrefabInstanceContext(GameObject obj) {
+            return PrefabStageUtility.GetPrefabStage(obj).mode == PrefabStage.Mode.InContext;
+        }
+        public static bool AmInPrefabIsolationContent(GameObject obj) {
+            return PrefabStageUtility.GetPrefabStage(obj).mode == PrefabStage.Mode.InIsolation;
+        }
     }
 
-    [Serializable]
+   [Serializable]
     public class ObjectToSync {
         public Transform Transform;
         public List<ComponentsToSync> Components;
