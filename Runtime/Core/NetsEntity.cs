@@ -366,7 +366,7 @@ namespace OdessaEngine.NETS.Core {
 
             if (Application.isPlaying == false) {
                 if (GetIsPrefab(gameObject) == false) {
-                    if (AmInPrefabInstanceContext(gameObject) && assignedGuid == new Guid().ToString("N")) {
+                    if ((Selection.Contains (gameObject)|| AmInPrefabInstanceContext(gameObject)) && assignedGuid == new Guid().ToString("N")) {
                         assignedGuid = Guid.NewGuid().ToString("N");
                         PrefabUtility.RecordPrefabInstancePropertyModifications(this);
                         EditorSceneManager.MarkSceneDirty(gameObject.scene);
