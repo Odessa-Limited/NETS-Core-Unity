@@ -372,7 +372,7 @@ namespace OdessaEngine.NETS.Core {
                     EditorUtility.SetDirty(gameObject);
                 }
                 if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
-                if (IsInPrefabMode(gameObject)) assignedGuid = new Guid().ToString("N");
+                if (PrefabUtility.IsPartOfPrefabInstance(gameObject) == false) assignedGuid = new Guid().ToString("N");
             }
 #endif
             ownershipSwitch = lastOwnState != OwnedByMe;
@@ -451,7 +451,6 @@ namespace OdessaEngine.NETS.Core {
             }
             if (PrefabUtility.GetPrefabAssetType(gameObject) != PrefabAssetType.NotAPrefab || PrefabStageUtility.GetCurrentPrefabStage() != null || !string.IsNullOrEmpty(AssetDatabase.GetAssetPath(gameObject)) || !string.IsNullOrEmpty(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this))) {
                 Id = 0;
-                assignedGuid = new Guid().ToString("N");
                 var longPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(this);
                 if (string.IsNullOrEmpty(longPath))
                     longPath = PrefabStageUtility.GetCurrentPrefabStage().assetPath;
