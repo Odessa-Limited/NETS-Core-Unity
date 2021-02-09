@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using UnityEngine.SocialPlatforms;
 using static OdessaEngine.NETS.Core.NetsNetworking;
 using WebSocketSharp;
+using UnityEngine.SceneManagement;
 
 #if UNITY_EDITOR
 using UnityEditor.SceneManagement;
@@ -371,8 +372,10 @@ namespace OdessaEngine.NETS.Core {
                     EditorUtility.SetDirty(gameObject);
                 }
                 if (GetIsPrefab(gameObject) && assignedGuid != new Guid().ToString("N")) assignedGuid = new Guid().ToString("N");
+                if(IsInPrefabMode(gameObject)) assignedGuid = new Guid().ToString("N");
             }
 #endif
+            UnityEditor.Experimental.SceneManagement.PrefabStage.();
             ownershipSwitch = lastOwnState != OwnedByMe;
             lastOwnState = OwnedByMe;
             if (Application.isPlaying) {
@@ -587,6 +590,9 @@ namespace OdessaEngine.NETS.Core {
 
         public static bool GetIsPrefab(GameObject obj) {
             return PrefabUtility.GetPrefabAssetType(obj) == PrefabAssetType.Regular;
+        }
+        public static bool IsInPrefabMode(GameObject obj) {
+            return PrefabStageUtility.GetCurrentPrefabStage()?.scene == SceneManager.GetActiveScene();
         }
     }
 
