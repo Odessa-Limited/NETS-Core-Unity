@@ -254,6 +254,14 @@ namespace OdessaEngine.NETS.Core {
                 bos.WriteString(eventString);
             }));
         }
+        public void SendOwnershipChange(Guid roomGuid, ulong entityId, Guid newOwner) {
+            w.Send(BitUtils.ArrayFromStream(bos => {
+                bos.WriteByte((byte)ClientToWorkerMessageType.ChangeOwner);
+                bos.WriteGuid(roomGuid);
+                bos.WriteUnsignedZeroableFibonacci(entityId);
+                bos.WriteGuid(newOwner);
+            }));
+        }
 
         public void WriteEntityDelta(NetsEntity e, KeyPairEntity entity) {
             w.Send(BitUtils.ArrayFromStream(bos => {

@@ -181,7 +181,7 @@ namespace OdessaEngine.NETS.Core {
         /// Use to check if the local account was the creator of this entity
         /// </summary>
         public Guid Creator => networkModel?.Creator ?? NetsNetworking.myAccountGuid ?? default;
-        public Guid Owner => networkModel?.Owner ?? default;
+        public Guid Owner { get { return networkModel?.Owner ?? default; } set { NetsNetworking.instance?.SendOwnershipChange(roomGuid, networkModel.Id, value); } }
 
         void OnDestroy() {
 #if UNITY_EDITOR
