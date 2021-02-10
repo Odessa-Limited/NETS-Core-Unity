@@ -505,6 +505,21 @@ namespace OdessaEngine.NETS.Core {
                         Debug.LogError(e);
                     }
                 } else if (category == (byte)WorkerToClientMessageType.LeftRoom) {
+                } else if (category == (byte)WorkerToClientMessageType.ChangeOwner) {
+                    var roomGuid = bb.ReadGuid();
+                    var senderAccountGuid = bb.ReadGuid();
+                    var entityId = bb.ReadUnsignedZeroableFibonacci();
+                    var newOwner = bb.ReadGuid();
+                    try {
+                        if (entityIdToNetsEntity[roomGuid].TryGetValue(entityId, out var nets)) {
+                            if (nets)
+                                nets.localModel.Owner = newOwner;
+                        } else {
+                            Debug.LogError($"Nets Entity doesn't exist. Room {roomGuid:N}, Entity{entityId}");
+                        }
+                    } catch(Exception e) {
+                        Debug.LogError(e);
+                    }
                 }
             } catch (Exception e) {
                 OnConnect?.Invoke(false);
