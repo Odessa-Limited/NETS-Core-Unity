@@ -629,6 +629,10 @@ namespace OdessaEngine.NETS.Core {
             //listener.OnConnected();
             HasJoinedRoom = false;
             initializedSingletons = false;
+            foreach(var ent in GetAllNetsEntitysOfTypes(AuthorityEnum.ServerSingleton)) {
+                Destroy(ent.gameObject);
+            }
+            KnownServerSingletons.Clear();
             while (valid) {
                 if (!w.isConnected) {
                     if (!intentionallyDisconnected) print("ws error!");
@@ -660,6 +664,9 @@ namespace OdessaEngine.NETS.Core {
             w.Close();
         }
 
+        private List<NetsEntity> GetAllNetsEntitysOfTypes(AuthorityEnum authType) {
+            return FindObjectsOfType<NetsEntity>().Where( e => e.Authority ==  authType).ToList();
+        }
         
         [Serializable]
         public class NetworkObjectConfig {
