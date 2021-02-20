@@ -104,6 +104,8 @@ namespace OdessaEngine.NETS.Core {
             };
             if(Authority == AuthorityEnum.Client) assignedGuid = Guid.NewGuid().ToString("N");
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
+            //Nets entitys don't get destroyed when changing scene
+            DontDestroyOnLoad(gameObject);
         }
         private void NetsStart() {
             if (hasStarted) return;
