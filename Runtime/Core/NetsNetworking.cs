@@ -356,12 +356,12 @@ namespace OdessaEngine.NETS.Core {
                         try {
                             if (settings.DebugConnections) print($"Created entity {entity.Id}: {entity.PrefabName}");
                             if (entity.Fields.ContainsKey(AssignedGuidFieldName)) {
-
                                 var guid = Guid.ParseExact(entity.GetString(AssignedGuidFieldName), "N");
                                 NetsEntity.NetsEntityByCreationGuidMap.TryGetValue(guid, out var matchedEntity);
                                 if (matchedEntity != null) {
                                     entityIdToNetsEntity[roomGuid].Add(entity.Id, matchedEntity);
                                     matchedEntity.OnCreatedOnServer(roomGuid, entity);
+                                    matchedEntity.Owner = entity.Owner;
                                     return Task.CompletedTask;
                                 }
                             }

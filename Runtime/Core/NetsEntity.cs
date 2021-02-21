@@ -28,7 +28,19 @@ namespace OdessaEngine.NETS.Core {
         [Range(0.0f, 20.0f)]
         public float SyncFramesPerSecond = 1f;
         [SerializeField]
-        public string assignedGuid = new Guid().ToString("N");
+        public string _assignedGuid = new Guid().ToString("N");
+        [SerializeField]
+        public string assignedGuid {
+            get { 
+                if(GuidMap.TryGetValue(GetInstanceID(), out var assigned)) {
+                    return assigned.ToString("N");
+                }
+                return _assignedGuid;
+            }
+            set {
+                _assignedGuid = value;
+            }
+        }
 
         public enum AuthorityEnum {
             Client,
@@ -45,7 +57,7 @@ namespace OdessaEngine.NETS.Core {
         public bool attemptedToCreateOnServer = false;
 
         private static bool IsNetsNativeType(Type t) => TypedField.SyncableTypeLookup.ContainsKey(t) || new[] { typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(t);
-        
+
         private static PropertyInfo[] GetValidPropertiesFor(Type t, bool isTopLevel) => t
             .GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Where(p => p.GetAccessors().Length == 2)
@@ -90,6 +102,62 @@ namespace OdessaEngine.NETS.Core {
         public static Dictionary<Guid, NetsEntity> NetsEntityByCreationGuidMap = new Dictionary<Guid, NetsEntity>();
         static Dictionary<string, NetsEntity> NetsEntityByRoomAndIdMap = new Dictionary<string, NetsEntity>();
 
+        private static NETSEntityDefinitions _DefinitionMap = default;
+        private static Dictionary<int, Guid> _DefinitionMapped = new Dictionary<int, Guid>();
+        static Dictionary<int,Guid> GuidMap { 
+            get {
+                if(_DefinitionMap == default)
+                    LoadOrCreateDefinitionMap();
+                return _DefinitionMapped;
+            }
+        }
+        private static bool LoadOrCreateDefinitionMap() {
+            _DefinitionMap = Resources.Load("NETSEntityDefinitions") as NETSEntityDefinitions;
+#if UNITY_EDITOR
+            if (!_DefinitionMap) {
+                var scriptable = ScriptableObject.CreateInstance<NETSEntityDefinitions>();
+                AssetDatabase.CreateFolder("Assets", "Resources");
+                AssetDatabase.CreateAsset(scriptable, "Assets/Resources/NETSEntityDefinitions.asset");
+                EditorUtility.SetDirty(scriptable);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                _DefinitionMap = Resources.Load("NETSEntityDefinitions") as NETSEntityDefinitions;
+            }
+#endif
+            _DefinitionMapped = new Dictionary<int, Guid>();
+            foreach(var v in _DefinitionMap.GuidMap) {
+                _DefinitionMapped.Add(v.instanceID, Guid.ParseExact(v.assignedGuid,"N"));
+            }
+            return true;
+        }
+        private static void AddOrUpdateDefinitionMap(NetsEntity obj) {
+#if UNITY_EDITOR
+            var instanceID = obj.GetInstanceID();
+            var parsedValue = Guid.ParseExact(obj.assignedGuid, "N");
+            if (_DefinitionMapped.TryGetValue(instanceID, out _)) {
+                _DefinitionMapped[instanceID] = parsedValue;
+            } else {
+                _DefinitionMapped.Add(instanceID, parsedValue);
+            }
+            _DefinitionMap.GuidMap = NETSEntityDefinitions.GuidMapFromDict(_DefinitionMapped);
+            EditorUtility.SetDirty(_DefinitionMap);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+#endif
+        }
+        private static void RemoveFromDefinitionMap(NetsEntity obj) {
+#if UNITY_EDITOR
+            var instanceID = obj.GetInstanceID();
+            if (_DefinitionMapped.TryGetValue(instanceID, out _)) {
+                _DefinitionMapped.Remove(instanceID);
+                _DefinitionMap.GuidMap = NETSEntityDefinitions.GuidMapFromDict(_DefinitionMapped);
+                EditorUtility.SetDirty(_DefinitionMap);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
+#endif
+        }
+
         [HideInInspector]
         public string prefab;
 
@@ -102,7 +170,7 @@ namespace OdessaEngine.NETS.Core {
                 PrefabName = prefab,
                 isNew = true,
             };
-            if(Authority == AuthorityEnum.Client) assignedGuid = Guid.NewGuid().ToString("N");
+            if (Authority == AuthorityEnum.Client) assignedGuid = Guid.NewGuid().ToString("N");
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
             //Nets entitys don't get destroyed when changing scene
             DontDestroyOnLoad(gameObject);
@@ -123,9 +191,9 @@ namespace OdessaEngine.NETS.Core {
             if (assignedGuid == new Guid().ToString("N")) {
                 assignedGuid = Guid.NewGuid().ToString("N");
             }
-            if (attemptedToCreateOnServer == false) { 
+            if (attemptedToCreateOnServer == false) {
                 localModel.SetString(NetsNetworking.AssignedGuidFieldName, assignedGuid);
-                NetsEntityByCreationGuidMap.Add(Guid.ParseExact(assignedGuid,"N"), this);
+                NetsEntityByCreationGuidMap.Add(Guid.ParseExact(assignedGuid, "N"), this);
                 SetPropertiesBeforeCreation = true;
                 LateUpdate();
                 SetPropertiesBeforeCreation = false;
@@ -198,11 +266,11 @@ namespace OdessaEngine.NETS.Core {
             }
         }
 
-		public void OnApplicationQuit() {
+        public void OnApplicationQuit() {
             destroyedByServer = true;
         }
 
-		public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
+        public Dictionary<string, ObjectProperty> pathToProperty = new Dictionary<string, ObjectProperty>();
         public Dictionary<string, Vector3LerpingObjectProperty> pathToLerpVector3 = new Dictionary<string, Vector3LerpingObjectProperty>();
         public Dictionary<string, QuaternionLerpingObjectProperty> pathToLerpQuaternion = new Dictionary<string, QuaternionLerpingObjectProperty>();
         HashSet<string> loggedUnknownPaths = new HashSet<string>();
@@ -240,12 +308,12 @@ namespace OdessaEngine.NETS.Core {
         bool SetPropertiesBeforeCreation = false;
         bool lastOwnershipState = default;
         public void LateUpdate() {
-            if (lastOwnershipState == default) { 
-                if(OwnedByMe)
-                    foreach (var c in transform.GetComponentsInChildren<NetsBehavior>()) 
+            if (lastOwnershipState == default) {
+                if (OwnedByMe)
+                    foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
                         c.NetsOnGainOwnership();
             }
-            if(lastOwnershipState != OwnedByMe) {
+            if (lastOwnershipState != OwnedByMe) {
                 foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
                     if (OwnedByMe)
                         c.NetsOnGainOwnership();
@@ -275,7 +343,7 @@ namespace OdessaEngine.NETS.Core {
                             if (IsNetsNativeType(objectToSave.GetType())) {
                                 if (objectToSave is Vector2 v2) objectToSave = new System.Numerics.Vector2(v2.x, v2.y);
                                 if (objectToSave is Vector3 v3) objectToSave = new System.Numerics.Vector3(v3.x, v3.y, v3.z);
-                                if (objectToSave is Quaternion v4) objectToSave = new System.Numerics.Vector4(v4.x, v4.y, v4.z,v4.w);
+                                if (objectToSave is Quaternion v4) objectToSave = new System.Numerics.Vector4(v4.x, v4.y, v4.z, v4.w);
                                 localModel.SetObject(f.PathName, objectToSave);
                             } else {
                                 localModel.SetJson(f.PathName, JsonConvert.SerializeObject(objectToSave));
@@ -307,7 +375,7 @@ namespace OdessaEngine.NETS.Core {
                     if (obj is System.Numerics.Vector3 v3) obj = v3.ToUnityVector3();
                     if (obj is System.Numerics.Vector4 v4) obj = v4.ToUnityQuaternion();
                     if (!IsNetsNativeType(objProp.Method.PropertyType)) {
-                        obj = JsonConvert.DeserializeObject((string)obj, objProp.Method.PropertyType); 
+                        obj = JsonConvert.DeserializeObject((string)obj, objProp.Method.PropertyType);
                     }
 
                     // Check lerps
@@ -350,6 +418,7 @@ namespace OdessaEngine.NETS.Core {
             }
         }
 
+
         IEnumerator createOnServer() {
             while (true) {
                 if (state != NetsEntityState.Insync) {
@@ -360,6 +429,11 @@ namespace OdessaEngine.NETS.Core {
                     break;
             }
         }
+        public static Guid Int2Guid(int value) {
+            byte[] bytes = new byte[16];
+            BitConverter.GetBytes(value).CopyTo(bytes, 0);
+            return new Guid(bytes);
+        }
 
         bool lastOwnState = false;
         bool ownershipSwitch = false;
@@ -367,12 +441,13 @@ namespace OdessaEngine.NETS.Core {
 #if UNITY_EDITOR
             if (Application.isPlaying == false) {
                 if (GetIsPrefab(gameObject) && assignedGuid == new Guid().ToString("N")) {
-                    assignedGuid = Guid.NewGuid().ToString("N");
-                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                    assignedGuid = Int2Guid(GetInstanceID()).ToString("N");
+                    AddOrUpdateDefinitionMap(this);
                     EditorSceneManager.MarkSceneDirty(gameObject.scene);
                     EditorUtility.SetDirty(gameObject);
-                } else if (AmInPrefabIsolationContent(gameObject) && assignedGuid != new Guid().ToString("N")) {
+                } else if (AmInPrefabIsolationContext(gameObject) && assignedGuid != new Guid().ToString("N")) {
                     assignedGuid = new Guid().ToString("N");
+                    RemoveFromDefinitionMap(this);
                     PrefabUtility.RecordPrefabInstancePropertyModifications(this);
                     EditorSceneManager.MarkSceneDirty(gameObject.scene);
                     EditorUtility.SetDirty(gameObject);
@@ -609,7 +684,7 @@ namespace OdessaEngine.NETS.Core {
 #endif
             return false;
         }
-        public static bool AmInPrefabIsolationContent(GameObject obj) {
+        public static bool AmInPrefabIsolationContext(GameObject obj) {
 #if UNITY_EDITOR
             return PrefabStageUtility.GetPrefabStage(obj)?.mode == PrefabStage.Mode.InIsolation;
 #endif

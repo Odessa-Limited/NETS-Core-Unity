@@ -15,7 +15,7 @@ namespace OdessaEngine.NETS.Core {
         public override void OnInspectorGUI() {
             serializedObject.Update();
             EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.assignedGuid)));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity._assignedGuid)));
             EditorGUI.EndDisabledGroup();
             if (PrefabStageUtility.GetCurrentPrefabStage() == null) {
                 EditorGUILayout.LabelField("Please modify the prefab to modify it's networking logic.");
