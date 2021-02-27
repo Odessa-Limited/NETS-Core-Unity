@@ -170,7 +170,7 @@ namespace OdessaEngine.NETS.Core {
                 PrefabName = prefab,
                 isNew = true,
             };
-            if (Authority == AuthorityEnum.Client) assignedGuid = Guid.NewGuid().ToString("N");
+            if (Authority == AuthorityEnum.Client && assignedGuid == new Guid().ToString("N")) assignedGuid = Guid.NewGuid().ToString("N");
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
             //Nets entitys don't get destroyed when changing scene
             DontDestroyOnLoad(gameObject);
@@ -251,6 +251,7 @@ namespace OdessaEngine.NETS.Core {
         /// Use to check if the local account was the creator of this entity
         /// </summary>
         public Guid Creator => networkModel?.Creator ?? NetsNetworking.myAccountGuid ?? default;
+
         public Guid Owner { get { return networkModel?.Owner ?? default; } set { NetsNetworking.instance?.SendOwnershipChange(roomGuid, networkModel.Id, value); } }
 
         void OnDestroy() {
