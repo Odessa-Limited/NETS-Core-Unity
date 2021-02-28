@@ -46,7 +46,7 @@ namespace OdessaEngine.NETS.Core {
         public float DebugLatency = 0f;
 
         private NETSSettings _settings;
-        private NETSSettings settings {
+        public NETSSettings settings {
             get {
                 if (!_settings)
                     LoadOrCreateSettings();
@@ -367,11 +367,10 @@ namespace OdessaEngine.NETS.Core {
                             }
 
                             if (entity.PrefabName == "?ClientConnection") {
-                                Debug.Log($"?ClientConnection created AccountGuid: {myAccountGuid} .ClientConnection guid:{ entity.GetString("AccountGuid") }");
                                 OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), PlayersInRoom().Count);
                             }
                             NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
-                            if (typeToCreate == null) {
+                            if (typeToCreate == null && entity.PrefabName.Contains("?") == false) {
                                 print("Unable to find object " + entity.Id + " " + entity.PrefabName);
                                 return Task.CompletedTask;
                             }
