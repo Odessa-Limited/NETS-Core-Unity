@@ -370,8 +370,9 @@ namespace OdessaEngine.NETS.Core {
                                 OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), PlayersInRoom().Count);
                             }
                             NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
-                            if (typeToCreate == null && entity.PrefabName.Contains("?") == false) {
-                                print("Unable to find object " + entity.Id + " " + entity.PrefabName);
+                            if (typeToCreate == null) {
+                                if(entity.PrefabName.Contains("?") == false)
+                                    print("Unable to find object " + entity.Id + " " + entity.PrefabName);
                                 return Task.CompletedTask;
                             }
 
