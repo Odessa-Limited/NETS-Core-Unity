@@ -25,7 +25,6 @@ var LibraryWebSockets = {
 
 			var thisObj = this;
 			window.addEventListener("message", function(e) {
-				if (e.origin != "https://wss.nets.odessaengine.com") return;
 				//console.log(e)
 
 				if (e.data.method == "Initialized"){
