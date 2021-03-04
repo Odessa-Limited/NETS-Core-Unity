@@ -20,7 +20,7 @@ var LibraryWebSockets = {
 			this.iframe = document.createElement('iframe');
 			this.iframe.id = "nets_iframe"
 			this.iframe.style.display = "none";
-			this.iframe.src = "https://wss.nets.odessaengine.com/index2.html?version=" + Math.random();
+			this.iframe.src = "https://nets.odessaengine.com/Static/ws.html?version=" + Math.random();
 			document.body.appendChild(this.iframe);
 
 			var thisObj = this;
