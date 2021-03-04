@@ -5,12 +5,12 @@ using UnityEngine;
 public static class NetsNetworkingConsts {
     public static string NETS_ROOM_SERVICE_URL { 
         get {
-            return "https://netstest.odessaengine.com/nets-room-service";
+            return "https://nets.odessaengine.com/nets-room-service";
         }
     }
     public static string NETS_AUTH_SERVICE_URL {
         get {
-            return "https://netstest.odessaengine.com/nets-account-service";
+            return "https://nets.odessaengine.com/nets-account-service";
         }
     }
     public static bool NETS_USING_SECURE { 
