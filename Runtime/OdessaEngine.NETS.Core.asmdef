@@ -1,12 +1,12 @@
 {
-    "name": "Odessa.NETS.Core.asmdef",
-    "rootNamespace": "OdessaEngine.NETS.Core",
+    "name": "OdessaEngine.NETS.Core.asmdef",
+    "rootNamespace": "",
     "references": [
         "GUID:3082c70fcbbd4eb43bd7ca841aeacc41"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
         "Odessa.Core.dll",

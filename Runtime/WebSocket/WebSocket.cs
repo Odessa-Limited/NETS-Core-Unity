@@ -8,33 +8,30 @@ using System.Collections;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
-public class WebSocket
-{
-	private Uri mUrl;
+namespace OdessaEngine.NETS.Core {
+	public class WebSocket {
+		private Uri mUrl;
 
-	public WebSocket(Uri url)
-	{
-		mUrl = url;
+		public WebSocket(Uri url) {
+			mUrl = url;
 
-		string protocol = mUrl.Scheme;
-		if (!protocol.Equals("ws") && !protocol.Equals("wss"))
-			throw new ArgumentException("Unsupported protocol: " + protocol);
-	}
+			string protocol = mUrl.Scheme;
+			if (!protocol.Equals("ws") && !protocol.Equals("wss"))
+				throw new ArgumentException("Unsupported protocol: " + protocol);
+		}
 
-	public void SendString(string str)
-	{
-		Send(Encoding.UTF8.GetBytes (str));
-	}
+		public void SendString(string str) {
+			Send(Encoding.UTF8.GetBytes(str));
+		}
 
-	public string RecvString()
-	{
-		byte[] retval = Recv();
-		if (retval == null)
-			return null;
-		return Encoding.UTF8.GetString (retval);
-	}
+		public string RecvString() {
+			byte[] retval = Recv();
+			if (retval == null)
+				return null;
+			return Encoding.UTF8.GetString(retval);
+		}
 
-    bool m_IsConnected = false;
+		bool m_IsConnected = false;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
 	[DllImport("__Internal")]
@@ -133,80 +130,72 @@ public class WebSocket
         }
     }
 #else
-	WebSocketSharp.WebSocket m_Socket;
-	Queue<byte[]> m_Messages = new Queue<byte[]>();
-	string m_Error = null;
+		WebSocketSharp.WebSocket m_Socket;
+		Queue<byte[]> m_Messages = new Queue<byte[]>();
+		string m_Error = null;
 
-	public IEnumerator Connect()
-	{
-		m_Socket = new WebSocketSharp.WebSocket(mUrl.ToString());
-        m_Socket.OnMessage += (sender, e) => {
-            lock (m_Messages) {
-                m_Messages.Enqueue(e.RawData);
-            }
-        };
-        m_Socket.OnOpen += (sender, e) => {
-            m_IsConnected = true;
-        };
-        m_Socket.OnError += (sender, e) => {
-            m_IsConnected = false;
-            Debug.Log("Socket error " + e.Message);
-        };//m_Error = e.Message;
-        Debug.Log("Connecting async");
-        m_Socket.ConnectAsync();
-        long startTime = System.DateTime.Now.Ticks;
-        while (!m_IsConnected && m_Error == null){
-            if ((System.DateTime.Now.Ticks - startTime) / 10000000 > 3) break;
-            yield return new WaitForSeconds(.5f);
-        }
-    }
-
-    public void Send(byte[] buffer)
-	{
-		m_Socket.Send(buffer);
-	}
-
-	public byte[] Recv()
-	{
-        lock (m_Messages) {
-            if (m_Messages.Count == 0)
-                return null;
-            return m_Messages.Dequeue();
-        }
-    }
-
-	public void Close()
-	{
-        m_IsConnected = false;
-        if (m_Socket!=null)
-            m_Socket.Close();
-	}
-
-	public string error
-	{
-		get {
-			return m_Error;
+		public IEnumerator Connect() {
+			m_Socket = new WebSocketSharp.WebSocket(mUrl.ToString());
+			m_Socket.OnMessage += (sender, e) => {
+				lock (m_Messages) {
+					m_Messages.Enqueue(e.RawData);
+				}
+			};
+			m_Socket.OnOpen += (sender, e) => {
+				m_IsConnected = true;
+			};
+			m_Socket.OnError += (sender, e) => {
+				m_IsConnected = false;
+				Debug.Log("Socket error " + e.Message);
+			};//m_Error = e.Message;
+			Debug.Log("Connecting async");
+			m_Socket.ConnectAsync();
+			long startTime = System.DateTime.Now.Ticks;
+			while (!m_IsConnected && m_Error == null) {
+				if ((System.DateTime.Now.Ticks - startTime) / 10000000 > 3) break;
+				yield return new WaitForSeconds(.5f);
+			}
 		}
-    }
 
-    public bool isConnected
-    {
-        get
-        {
-            return m_IsConnected;
-        }
-    }
-    public int getState
-    {
-        get
-        {
-            return m_IsConnected ? 1 : 0;
-        }
-	}
-	public bool isReady {
-		get {
-			return true;
+		public void Send(byte[] buffer) {
+			m_Socket.Send(buffer);
 		}
-	}
+
+		public byte[] Recv() {
+			lock (m_Messages) {
+				if (m_Messages.Count == 0)
+					return null;
+				return m_Messages.Dequeue();
+			}
+		}
+
+		public void Close() {
+			m_IsConnected = false;
+			if (m_Socket != null)
+				m_Socket.Close();
+		}
+
+		public string error {
+			get {
+				return m_Error;
+			}
+		}
+
+		public bool isConnected {
+			get {
+				return m_IsConnected;
+			}
+		}
+		public int getState {
+			get {
+				return m_IsConnected ? 1 : 0;
+			}
+		}
+		public bool isReady {
+			get {
+				return true;
+			}
+		}
 #endif
+	}
 }
