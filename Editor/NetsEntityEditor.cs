@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Experimental.SceneManagement;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace OdessaEngine.NETS.Core {
     [CustomEditor(typeof(NetsEntity))]
@@ -34,8 +35,11 @@ namespace OdessaEngine.NETS.Core {
             var rectStyle = new GUIStyle();
             rectStyle.normal.background = texture;
             EditorGUILayout.BeginVertical(rectStyle);
-
-            EditorGUILayout.PropertyField(objectsToSync, false, GUILayout.Height(40));
+            var headingStyle = new GUIStyle();
+            headingStyle.fontSize = 16;
+            headingStyle.fontStyle = FontStyle.Bold;
+            headingStyle.normal.textColor = Color.white;
+            EditorGUILayout.LabelField("Objects to Sync", headingStyle, GUILayout.Height(20));
 
             if (objectsToSync.isExpanded) {
                 EditorGUI.indentLevel += 1;
