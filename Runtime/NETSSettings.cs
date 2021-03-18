@@ -1,10 +1,12 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 namespace OdessaEngine.NETS.Core {
-	[CreateAssetMenu(fileName = "NETSSettings", menuName = "NETS/CreateSettingsObject", order = 1)]
+	//[CreateAssetMenu(fileName = "NETSSettings", menuName = "NETS/CreateSettingsObject", order = 1)]
 	[Serializable]
 	public class NETSSettings : ScriptableObject {
 		[Header("Project Settings")]
@@ -28,5 +30,30 @@ namespace OdessaEngine.NETS.Core {
 		public string DebugRoomGuid = "00000000000000000000000000000000";
 		[SerializeField]
 		public bool DebugConnections = true;
+		[SerializeField]
+		[Range(0, 500)]
+		public float DebugLatency = 0f;
+
+		private static NETSSettings _instance;
+		public static NETSSettings instance {
+			get {
+				if (_instance != null) return _instance;
+
+				_instance = Resources.Load("NETSSettings") as NETSSettings;
+#if UNITY_EDITOR
+				if (!_instance) {
+					var scriptable = ScriptableObject.CreateInstance<NETSSettings>();
+					AssetDatabase.CreateFolder("Assets", "Resources");
+					AssetDatabase.CreateAsset(scriptable, "Assets/Resources/NETSSettings.asset");
+					EditorUtility.SetDirty(scriptable);
+					AssetDatabase.SaveAssets();
+					AssetDatabase.Refresh();
+					_instance = Resources.Load("NETSSettings") as NETSSettings;
+				}
+#endif
+				return _instance;
+			}
+		}
+
 	}
 }
