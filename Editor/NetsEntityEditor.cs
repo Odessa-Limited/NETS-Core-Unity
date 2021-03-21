@@ -113,8 +113,6 @@ namespace OdessaEngine.NETS.Core {
                         }
                         //EditorGUILayout.LabelField(pathName.stringValue);
                     }
-
-
                 }
 
                 EditorGUI.indentLevel -= 1;

@@ -84,6 +84,20 @@ namespace OdessaEngine.NETS.Core {
                 nameof(SpriteRenderer.flipX),
             }.Contains(p.Name))
 
+            .Where(p => t != typeof(BoxCollider) || new string[] {
+                nameof(BoxCollider.size),
+            }.Contains(p.Name))
+
+            .Where(p => t != typeof(BoxCollider2D) || new string[] {
+                nameof(BoxCollider2D.size),
+            }.Contains(p.Name))
+
+            .Where(p => t != typeof(PolygonCollider2D) || new string[] {
+                nameof(PolygonCollider2D.points),
+            }.Contains(p.Name))
+
+            .Where(p => t != typeof(AudioSource))
+
             /* Checking to ensure we had a conversion type for it
              * .Where(p => TypedField.SyncableTypeLookup.ContainsKey(p.PropertyType) || new []{ typeof(Vector2), typeof(Vector3), typeof(Quaternion) }.Contains(p.PropertyType))*/
             .ToArray();
@@ -170,8 +184,12 @@ namespace OdessaEngine.NETS.Core {
                 PrefabName = prefab,
                 isNew = true,
             };
+
+            //Deal with Assigned GUID in Spawn state
             if (Authority == AuthorityEnum.Client && assignedGuid == new Guid().ToString("N")) assignedGuid = Guid.NewGuid().ToString("N");
+            if (Authority == AuthorityEnum.Server && assignedGuid == new Guid().ToString("N")) assignedGuid = Guid.NewGuid().ToString("N");
             if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
+           
             //Nets entitys don't get destroyed when changing scene
             DontDestroyOnLoad(gameObject);
         }
@@ -188,9 +206,6 @@ namespace OdessaEngine.NETS.Core {
             if (NetsNetworking.instance?.canSend != true) return;
             if (destroyedByServer) return;
             if (state != NetsEntityState.Uninitialized) return;
-            if (assignedGuid == new Guid().ToString("N")) {
-                assignedGuid = Guid.NewGuid().ToString("N");
-            }
             if (attemptedToCreateOnServer == false) {
                 localModel.SetString(NetsNetworking.AssignedGuidFieldName, assignedGuid);
                 NetsEntityByCreationGuidMap.Add(Guid.ParseExact(assignedGuid, "N"), this);
