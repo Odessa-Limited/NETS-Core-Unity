@@ -18,8 +18,8 @@ public class RoomServiceUtils : MonoBehaviour {
 
 
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
-    static string roomserviceUrl => settings.UseLocalConnectionInUnity ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
-    static string authUrl => settings.UseLocalConnectionInUnity ? "http://127.0.0.1:8002" : NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
+    static string roomserviceUrl => settings.UseLocalServices ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
+    static string authUrl => settings.UseLocalServices ? "http://127.0.0.1:8002" : NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
 #else
     static string url => NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
     static string authUrl => NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
@@ -27,7 +27,10 @@ public class RoomServiceUtils : MonoBehaviour {
 
     private static AuthResponse currentAuth;
     private static long refreshTokenAt = -1;
+    private static string authSubject = null;
     private static bool gettingAuth = false;
+
+    public static Guid GetMyAccountGuid() => authSubject != null ? Guid.ParseExact(authSubject, "N") : default;
 
     internal static IEnumerator EnsureAuth() {
         var needsToken = currentAuth == null;
@@ -132,6 +135,7 @@ public class RoomServiceUtils : MonoBehaviour {
         var tokenInfo = DecodeJwt(authResponse.accessToken);
         var tokenLifetime = Convert.ToInt64(tokenInfo["exp"]) - Convert.ToInt64(tokenInfo["iat"]);
         refreshTokenAt = DateTimeOffset.Now.ToUnixTimeSeconds() + tokenLifetime / 2;
+        authSubject = tokenInfo["sub"];
     }
 
     private static Dictionary<string, string> DecodeJwt(string jwt) {

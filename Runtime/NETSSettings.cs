@@ -21,18 +21,12 @@ namespace OdessaEngine.NETS.Core {
 
 		[Header("NETS Developer Tools")]
 		[SerializeField]
-		public bool UseLocalConnectionInUnity = false;
+		public bool UseLocalServices = false;
 		[SerializeField]
-		public bool HitWorkerDirectly = false;
-		[SerializeField]
-		public string DebugWorkerUrlAndPort = "140.82.41.234:12334";
-		[SerializeField]
-		public string DebugRoomGuid = "00000000000000000000000000000000";
-		[SerializeField]
-		public bool DebugConnections = true;
+		public bool DebugConnections = false;
 		[SerializeField]
 		[Range(0, 500)]
-		public float DebugLatency = 0f;
+		public float DebugLatencyMs = 0f;
 
 		private static NETSSettings _instance;
 		public static NETSSettings instance {

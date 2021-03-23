@@ -10,7 +10,6 @@ using Odessa.Nets.EntityTracking.Wrappers;
 using Odessa.Nets.EntityTracking.EventObjects.NativeTypes;
 
 #if UNITY_EDITOR
-using UnityEditor.SceneManagement;
 using UnityEditor.Experimental.SceneManagement;
 using UnityEditor;
 #endif
@@ -18,9 +17,8 @@ using UnityEditor;
 namespace OdessaEngine.NETS.Core {
     [ExecuteAlways]
     public class NetsEntity : MonoBehaviour {
-        public static Dictionary<Guid, NetsEntity> NetsEntityByUniqueIdMap = new Dictionary<Guid, NetsEntity>();
-
         public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
+        public Transform addedTransform;
 
         [Range(0.0f, 20.0f)]
         public float SyncFramesPerSecond = 1f;
@@ -30,11 +28,26 @@ namespace OdessaEngine.NETS.Core {
         bool destroyedByServer = false;
         public void MarkAsDestroyedByServer() => destroyedByServer = true;
 
-        bool hasStarted = false;
+        public bool hasStarted = false;
 
         EntityModel localModel;
         EntityModel networkModel;
         public EntityModel Model() => IsOwnedByMe ? localModel : networkModel;
+        public NetsRoomConnection connection;
+
+        private NetsRoomConnection _conn;
+        public NetsRoomConnection conn {
+            get {
+                if (_conn == null) _conn = NetsNetworking
+                    .GetConnections()
+                    .SingleOrDefault(); // Multi-room is not yet supported
+
+                return _conn;
+            }
+            set {
+                _conn = value;
+            }
+        }
 
         [HideInInspector]
         public string prefab;
@@ -65,7 +78,8 @@ namespace OdessaEngine.NETS.Core {
             Singleton: Never generate
              */
 
-            if (Authority == AuthorityEnum.ServerSingleton && NetsNetworking.KnownServerSingletons.ContainsKey(prefab) == false) NetsNetworking.KnownServerSingletons.Add(prefab, this);
+            if (Authority == AuthorityEnum.ServerSingleton && conn.KnownServerSingletons.ContainsKey(prefab) == false)
+                conn.KnownServerSingletons.Add(prefab, this);
 
             //Nets entitys don't get destroyed when changing scene
             DontDestroyOnLoad(gameObject);
@@ -75,13 +89,14 @@ namespace OdessaEngine.NETS.Core {
 
         void TryCreateOnServer() {
             if (IsReady) return;
-            if (NetsNetworking.instance?.canSend != true) return;
-            if (NetsNetworking.room == null) return;
-            if (NetsNetworking.myAccountGuid == null) return;
+            if (conn == null) return;
+            if (conn.canSend != true) return;
+            if (conn.roomGuid == null) return;
+            if (conn.myAccountGuid == null) return;
 
             var entityGuid = GetEntityGuid();
-            localModel = new EntityModel(new DictionaryType(), entityGuid.ToString("N"), NetsNetworking.room);
-            NetsEntityByUniqueIdMap.Add(entityGuid, this);
+            localModel = new EntityModel(new DictionaryType(), entityGuid.ToString("N"), conn.room);
+            conn.entityIdToNetsEntity.Add(entityGuid.ToString("N"), this);
             StorePropertiesToModel();
 
             //NetsNetworking.instance?.CreateFromGameObject(this);
@@ -134,13 +149,13 @@ namespace OdessaEngine.NETS.Core {
         /// If this is the server and the server owns this
         /// </summary>
         public bool IsOwnedByMe => (networkModel == null && Authority == AuthorityEnum.Client) ||
-            (Authority.IsServerOwned() && NetsNetworking.instance?.IsServer == true) ||
-            (NetsNetworking.myAccountGuid != null && NetsNetworking.myAccountGuid == networkModel?.Owner);
+            (Authority.IsServerOwned() && conn?.IsServer == true) ||
+            (conn?.myAccountGuid != null && conn?.myAccountGuid == networkModel?.Owner);
 
         /// <summary>
         /// Use to check if the local account was the creator of this entity
         /// </summary>
-        public Guid Creator => networkModel?.Creator ?? NetsNetworking.myAccountGuid ?? default;
+        public Guid Creator => networkModel?.Creator ?? conn.myAccountGuid ?? default;
 
         public Guid Owner { get => Model().Owner; set => Model().Owner = value; }
 
@@ -208,7 +223,7 @@ namespace OdessaEngine.NETS.Core {
                             continue;
                         }
                         var objectToSave = objProp.Value();
-                        if (objectToSave.GetType().IsNetsNativeType()) {
+                        if (objProp.Method.PropertyType.IsNetsNativeType()) {
                             localModel.Fields.SetObject(f.PathName, objectToSave);
                         } else {
                             localModel.Fields.SetString(f.PathName, JsonConvert.SerializeObject(objectToSave));
@@ -477,7 +492,7 @@ namespace OdessaEngine.NETS.Core {
             if (methodToIdLookup.TryGetValue(method, out var index)) {
                 TryCreateOnServer();
                 try {
-                    NetsNetworking.instance.SendEntityEvent(this, JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
+                    conn.SendEntityEvent(this, JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
                 } catch (Exception e) {
                     Debug.LogError(e);
                 }

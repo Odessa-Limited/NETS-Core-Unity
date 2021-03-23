@@ -10,9 +10,9 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "Odessa.Core.dll",
+        "Odessa.Nets.EntityTracking.dll",
         "websocket-sharp.dll",
-        "Newtonsoft.Json.dll",
-        "Odessa.Nets.EntityTracking.dll"
+        "Newtonsoft.Json.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

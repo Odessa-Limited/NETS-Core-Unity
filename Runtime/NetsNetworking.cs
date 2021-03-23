@@ -15,6 +15,10 @@ namespace OdessaEngine.NETS.Core {
         public static Action<Guid> OnJoinedRoom;
         public static Action<Guid> OnLeaveRoom;
 
+        public static Action<Guid, bool> OnConnect;
+        public static Action<Guid, bool> OnIsServer;
+        public static Action<Guid, int> OnPlayerCountChange;
+
         private NETSSettings settings => NETSSettings.instance;
 
         static NetsNetworking() {
@@ -56,22 +60,18 @@ namespace OdessaEngine.NETS.Core {
 		public void Start() {
             if (Application.isPlaying == false) return;
 
-            if (settings.HitWorkerDirectly) {
-                ConnectViaRoomState(new RoomState {
-                    ip = settings.DebugWorkerUrlAndPort,
-                    token = settings.DebugRoomGuid,
-                    name = "Debug",
-                    playerCount = 0,
-                });
-                return;
-            }
-
             if (settings.KeepReferenceOfAccount) StartCoroutine(RoomServiceUtils.EnsureAuth());
             if (settings.AutomaticRoomLogic) JoinAnyRoom();
         }
 
         internal static NetsRoomConnection ConnectViaRoomState(RoomState stateToJoin) {
+            print($"Connecting to room state {stateToJoin.token}");
             var connection = new NetsRoomConnection(stateToJoin);
+
+            connection.OnConnect += (connected) => OnConnect?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), connected);
+            connection.OnIsServer += (connected) => OnIsServer?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), connected);
+            connection.OnPlayerCountChange += (count) => OnPlayerCountChange?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), count);
+
             joinedRooms.Add(connection);
             return connection;
         }

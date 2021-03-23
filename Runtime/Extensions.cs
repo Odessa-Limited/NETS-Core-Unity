@@ -12,6 +12,7 @@ using UnityEditor.Experimental.SceneManagement;
 using UnityEditor;
 #endif
 
+#pragma warning disable CS0162 // Unreachable code detected
 namespace OdessaEngine.NETS.Core {
 	public static class Extensions {
 		public static bool IsServerOwned(this AuthorityEnum e) => e == AuthorityEnum.Server || e == AuthorityEnum.ServerSingleton;
@@ -183,4 +184,5 @@ namespace OdessaEngine.NETS.Core {
 
 
 	}
+#pragma warning restore CS0162 // Unreachable code detected
 }

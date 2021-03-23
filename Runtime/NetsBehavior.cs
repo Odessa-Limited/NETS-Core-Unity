@@ -40,22 +40,19 @@ namespace OdessaEngine.NETS.Core {
             try {
                 TryInitialize();
             } catch (Exception e) {
-                Debug.LogError($"NETSInitialize error on: {GetType().Name}");
-                Debug.LogError(e);
+                Debug.LogError($"NETSInitialize error on: {GetType().Name}\n{e}");
             }
             if (!woke) {
                 woke = true;
                 try {
                     NetsAwake();
                 } catch (Exception e) {
-                    Debug.LogError($"NETSAwake error on: {GetType().Name}");
-                    Debug.LogError(e);
+                    Debug.LogError($"NETSAwake error on: {GetType().Name}\n{e}");
                 }
                 try {
                     if (Entity.IsOwnedByMe) NetsOwnedAwake();
                 } catch (Exception e) {
-                    Debug.LogError($"NETSOwnedAwake error on: {GetType().Name}");
-                    Debug.LogError(e);
+                    Debug.LogError($"NETSOwnedAwake error on: {GetType().Name}\n{e}");
                 }
             }
         }

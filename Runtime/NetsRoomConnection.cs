@@ -1,7 +1,10 @@
+using Newtonsoft.Json;
 using Odessa.Nets.Core;
 using Odessa.Nets.Core.Models;
 using Odessa.Nets.EntityTracking;
+using Odessa.Nets.EntityTracking.EventObjects;
 using Odessa.Nets.EntityTracking.EventObjects.NativeEvents;
+using Odessa.Nets.EntityTracking.EventObjects.NativeTypes;
 using Odessa.Nets.EntityTracking.Wrappers;
 using System;
 using System.Collections;
@@ -10,18 +13,19 @@ using System.Linq;
 using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
-    public class NetsRoomConnection {
+    public class NetsRoomConnection : IListenToEventApplication {
 
-        public static Action<Guid, int> OnPlayersInRoomLeft;
-        public static Action<Guid, int> OnPlayersInRoomJoined;
+        public Action<Guid, int> OnPlayersInRoomLeft;
+        public Action<Guid, int> OnPlayersInRoomJoined;
 
-        public static Action<bool> OnConnect;
-        public static Action<bool> OnIsServer;
+        public Action<bool> OnConnect;
+        public Action<bool> OnIsServer;
+        public Action<int> OnPlayerCountChange; // TODO
 
 
         public bool IsServer = false;
-        public static Guid? myAccountGuid { get; set; } = null;
-        public static Guid? roomGuid = null;
+        public Guid? myAccountGuid { get; set; } = null;
+        public Guid? roomGuid = null;
 
         WebSocket w;
 
@@ -30,7 +34,7 @@ namespace OdessaEngine.NETS.Core {
 
         bool oldConnected = false;
 
-        public static Dictionary<string, NetsEntity> KnownServerSingletons = new Dictionary<string, NetsEntity>();
+        public Dictionary<string, NetsEntity> KnownServerSingletons = new Dictionary<string, NetsEntity>();
 
 
         private NETSSettings settings => NETSSettings.instance;
@@ -39,12 +43,14 @@ namespace OdessaEngine.NETS.Core {
         Coroutine StartCoroutine(IEnumerator e) => monoRef.StartCoroutine(e);
 
         public NetsRoomConnection(RoomState roomState) {
+            myAccountGuid = RoomServiceUtils.GetMyAccountGuid();
+
             var protocol = roomState.ip.Contains(":125") ? "wss" : "ws";
-            StartCoroutine(connect($"{protocol}://{settings.DebugWorkerUrlAndPort}"));
+            StartCoroutine(connect($"{protocol}://{roomState.ip}"));
             StartCoroutine(WaitUntilConnected(() => {
                 var sendData = BitUtils.ArrayFromStream(bos => {
                     bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                    bos.WriteGuid(Guid.ParseExact(settings.DebugRoomGuid, "N"));
+                    bos.WriteString(roomState.token);
                 });
                 w.Send(sendData);
             }));
@@ -54,8 +60,7 @@ namespace OdessaEngine.NETS.Core {
         IEnumerator connect(string url) {
             intentionallyDisconnected = false;
             if (connected) {
-                if (settings.DebugConnections)
-                    print("Already connected");
+                if (settings.DebugConnections)  print("Already connected");
                 yield break;
             }
             WebSocket conn = new WebSocket(new Uri(url));
@@ -130,7 +135,7 @@ namespace OdessaEngine.NETS.Core {
                     yield return new WaitForSeconds(.03f); // Basically just yield to other threads, checking 30 times a sec
                     continue;
                 }
-                if (settings.DebugLatency > 0)
+                if (settings.DebugLatencyMs > 0)
                     yield return HandlePacketWithDelay(data);
                 else
                     HandlePacket(data);
@@ -140,7 +145,7 @@ namespace OdessaEngine.NETS.Core {
             w.Close();
         }
 
-        public static List<EntityModel> Players() {
+        public List<EntityModel> Players() {
             return room.ClientConnectionModels.Values.ToList();
         }
 
@@ -157,7 +162,6 @@ namespace OdessaEngine.NETS.Core {
                     MonoBehaviour.Destroy(e.gameObject);
             }
 
-            NetsEntity.NetsEntityByUniqueIdMap.Clear();
             entityIdToNetsEntity.Clear();
             room = new RoomModel();
             KnownServerSingletons.Clear();
@@ -171,16 +175,134 @@ namespace OdessaEngine.NETS.Core {
 
 
         bool connected = false;
-        public static RoomModel room;
-        public static Dictionary<string, NetsEntity> entityIdToNetsEntity = new Dictionary<string, NetsEntity>();
+        public RoomModel room;
+        public Dictionary<string, NetsEntity> entityIdToNetsEntity = new Dictionary<string, NetsEntity>();
 
         bool initializedSingletons = false;
         bool HasJoinedRoom = false;
         IEnumerator HandlePacketWithDelay(byte[] data) {
-            if (settings.DebugLatency > 0)
-                yield return new WaitForSeconds(settings.DebugLatency / 1000f);
+            if (settings.DebugLatencyMs > 0)
+                yield return new WaitForSeconds(settings.DebugLatencyMs / 1000f);
             HandlePacket(data);
         }
+
+        public void OnEntityDestroyed(EntityModel entity) {
+            try {
+                if (settings.DebugConnections) print($"Removed {entity.uniqueId} {entity.PrefabName}");
+                if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e) && e != null && e.gameObject != null) {
+                    e.MarkAsDestroyedByServer();
+                    MonoBehaviour.Destroy(e.gameObject);
+                }
+                entityIdToNetsEntity.Remove(entity.uniqueId);
+                /*
+                if (entity.PrefabName == "?ClientConnection") {
+                    OnPlayersInRoomLeft?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), Players().Count);
+                }
+                */
+            } catch (Exception e) {
+                Debug.LogError(e);
+            }
+        }
+
+        public void OnEntityCreated(EntityModel entity) {
+            try {
+                if (settings.DebugConnections) print($"Created entity {entity.uniqueId}: {entity.PrefabName}");
+
+                entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var matchedEntity);
+                if (matchedEntity != null) {
+                    entityIdToNetsEntity[entity.uniqueId] = matchedEntity;
+                    matchedEntity.OnCreatedOnServer(roomGuid.Value, entity);
+                    matchedEntity.Owner = entity.Owner;
+                }
+                /*
+                if (entity.PrefabName == "?ClientConnection") {
+                    OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), Players().Count);
+                }
+                */
+                NETSNetworkedTypesLists.instance.NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
+                if (typeToCreate == null) {
+                    if (entity.PrefabName.Contains("?") == false)
+                        print("Unable to find object " + entity.uniqueId+ " " + entity.PrefabName);
+                }
+
+                if (IsServer && KnownServerSingletons.ContainsKey(typeToCreate.name)) {
+                    //DestroyEntity(entity);
+                    throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
+                }
+
+                typeToCreate.prefab.SetActive(false);
+                var newGo = MonoBehaviour.Instantiate(typeToCreate.prefab, new Vector3(0, 0, 0), Quaternion.Euler(0, 0, 0));
+                typeToCreate.prefab.SetActive(true);
+
+                newGo.GetComponentsInChildren<NetsBehavior>().ToList().ForEach(b => b.TryInitialize());
+                var component = newGo.GetComponent<NetsEntity>();
+                if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
+                entityIdToNetsEntity[entity.uniqueId] = component;
+                component.OnCreatedOnServer(roomGuid.Value, entity);
+                newGo.SetActive(true);
+            } catch (Exception e) {
+                Debug.LogWarning(e);
+            }
+        }
+
+        public void AfterEventsApplied() {
+            try {
+                if (IsServer && !initializedSingletons) {
+                    foreach (var s in NETSNetworkedTypesLists.instance.ServerSingletonsList)
+                        if (KnownServerSingletons.ContainsKey(s.name) == false) {
+                            Debug.Log("Init prefab for singleton");
+                            MonoBehaviour.Instantiate(s.prefab);
+                        }
+                    initializedSingletons = true;
+                }
+                if (HasJoinedRoom == false) {
+                    HasJoinedRoom = true;
+                }
+            } catch (Exception e) {
+                Debug.LogError(e);
+            }
+        }
+
+        public void OnEntityPropertyChanged(EntityModel entity, string key) {
+            try {
+                //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
+                /*
+                if (entity.Id == 1) {
+                    if (entity.PrefabName != "?Room") throw new Exception("Expected room as entity ID 1");
+                    if (field.Name == "ServerAccount") {
+                        IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
+                        if (settings.DebugConnections) print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
+
+                        if (IsServer == false) {
+                            var startingEnts = NetsNetworking.FindObjectsOfType<NetsEntity>();
+                            var localServerEntities = startingEnts
+                                .Where(e => e.Authority.IsServerOwned() && e.Id == 0)
+                                .ToList();
+                            if (settings.DebugConnections) {
+                                print($"Found {localServerEntities.Count} server entities to destroy as we are not server. {string.Join(",", localServerEntities.Select(e => e.prefab))}");
+                            }
+                            localServerEntities.ForEach(e => {
+                                var comp = e.GetComponent<NetsEntity>();
+                                comp.MarkAsDestroyedByServer(); // Avoid throwing
+                                KnownServerSingletons.Remove(comp.prefab);
+                                Destroy(e.gameObject);
+                            });
+                        }
+                        OnIsServer?.Invoke(IsServer);
+                    }
+                    return;
+                }
+                */
+                if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e)) {
+                    e.OnFieldChange(entity.Fields, key);
+                } else {
+                    print("Unknown entity: " + entity.uniqueId);
+                }
+            } catch (Exception e) {
+                Debug.LogError(e);
+            }
+        }
+
 
         void HandlePacket(byte[] data) {
             try {
@@ -194,155 +316,26 @@ namespace OdessaEngine.NETS.Core {
                     SendPong(requestId);
                 } else if (category == (byte)WorkerToClientMessageType.JoinedRoom) {
                     roomGuid = bb.ReadGuid();
-                    if (settings.DebugConnections)
-                        Debug.Log($"NETS - Joined Room ID {roomGuid}");
                     myAccountGuid = bb.ReadGuid();
+                    if (settings.DebugConnections) Debug.Log($"NETS - Joined Room ID {roomGuid}");
                     room = new RoomModel();
-
-                    keyPairEntityCollectors[roomGuid].AfterEntityCreated = (entity) => {
-                        try {
-                            if (settings.DebugConnections) print($"Created entity {entity.Id}: {entity.PrefabName}");
-                            if (entity.Fields.ContainsKey(AssignedGuidFieldName)) {
-                                var guid = Guid.ParseExact(entity.GetString(AssignedGuidFieldName), "N");
-                                NetsEntity.NetsEntityByUniqueIdMap.TryGetValue(guid, out var matchedEntity);
-                                if (matchedEntity != null) {
-                                    entityIdToNetsEntity[roomGuid].Add(entity.Id, matchedEntity);
-                                    matchedEntity.OnCreatedOnServer(roomGuid, entity);
-                                    matchedEntity.Owner = entity.Owner;
-                                    return Task.CompletedTask;
-                                }
-                            }
-
-                            if (entity.PrefabName == "?ClientConnection") {
-                                OnPlayersInRoomJoined?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), Players().Count);
-                            }
-                            NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
-                            if (typeToCreate == null) {
-                                if (entity.PrefabName.Contains("?") == false)
-                                    print("Unable to find object " + entity.Id + " " + entity.PrefabName);
-                                return Task.CompletedTask;
-                            }
-
-                            if (IsServer && KnownServerSingletons.ContainsKey(typeToCreate.name)) {
-                                DestroyEntity(entity.Id);
-                                throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
-                            }
-
-                            typeToCreate.prefab.SetActive(false);
-                            var newGo = Instantiate(typeToCreate.prefab, new Vector3(0, 0, 0), Quaternion.Euler(0, 0, 0));
-                            typeToCreate.prefab.SetActive(true);
-
-                            newGo.GetComponentsInChildren<NetsBehavior>().ToList().ForEach(b => b.TryInitialize());
-                            var component = newGo.GetComponent<NetsEntity>();
-                            if (component.Authority == AuthorityEnum.ServerSingleton) KnownServerSingletons[typeToCreate.name] = component;
-                            entityIdToNetsEntity[roomGuid].Add(entity.Id, component);
-                            component.OnCreatedOnServer(roomGuid, entity);
-                            newGo.SetActive(true);
-                        } catch (Exception e) {
-                            Debug.LogWarning(e);
-                        }
-                        return Task.CompletedTask;
-                    };
-                    keyPairEntityCollectors[roomGuid].AfterEntityUpdated = async (entity) => {
-                        try {
-                            //if (settings.DebugConnections) print($"After updated entity {entity.Id}");
-                            await Task.CompletedTask;
-                        } catch (Exception e) {
-                            Debug.LogError(e);
-                        }
-                    };
-                    keyPairEntityCollectors[roomGuid].AfterChangeStreamApplied = async () => {
-                        try {
-                            if (IsServer && !initializedSingletons) {
-                                foreach (var s in typedLists.ServerSingletonsList)
-                                    if (KnownServerSingletons.ContainsKey(s.name) == false) {
-                                        Debug.Log("Init prefab for singleton");
-                                        Instantiate(s.prefab);
-                                    }
-                                initializedSingletons = true;
-                            }
-                            if (HasJoinedRoom == false) {
-                                OnJoinedRoom?.Invoke(roomGuid);
-                                HasJoinedRoom = true;
-                            }
-                            await Task.CompletedTask;
-                        } catch (Exception e) {
-                            Debug.LogError(e);
-                        }
-                    };
-                    keyPairEntityCollectors[roomGuid].AfterKeyChanged = async (entity, field) => {
-                        try {
-                            //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
-                            if (entity.Id == 1) {
-                                if (entity.PrefabName != "?Room") throw new Exception("Expected room as entity ID 1");
-                                if (field.Name == "ServerAccount") {
-                                    IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
-                                    if (settings.DebugConnections) print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
-
-                                    if (IsServer == false) {
-                                        var startingEnts = FindObjectsOfType<NetsEntity>();
-                                        var localServerEntities = startingEnts
-                                            .Where(e => e.Authority.IsServerOwned() && e.Id == 0)
-                                            .ToList();
-                                        if (settings.DebugConnections) {
-                                            print($"Found {localServerEntities.Count} server entities to destroy as we are not server. {string.Join(",", localServerEntities.Select(e => e.prefab))}");
-                                        }
-                                        localServerEntities.ForEach(e => {
-                                            var comp = e.GetComponent<NetsEntity>();
-                                            comp.MarkAsDestroyedByServer(); // Avoid throwing
-                                            KnownServerSingletons.Remove(comp.prefab);
-                                            Destroy(e.gameObject);
-                                        });
-                                    }
-                                    OnIsServer?.Invoke(IsServer);
-                                }
-                                return;
-                            }
-                            if (entity.PrefabName.StartsWith("?") == false) {
-                                if (entityIdToNetsEntity.TryGetValue(roomGuid, out var roomDict)) {
-                                    if (roomDict.TryGetValue(entity.Id, out var e)) {
-                                        e.OnFieldChange(entity, field.Name);
-                                    } else {
-                                        print("Unknown id: " + entity.Id);
-                                    }
-                                } else {
-                                    print("Unknown room: " + roomGuid);
-                                }
-                            }
-                            await Task.CompletedTask;
-                        } catch (Exception e) {
-                            Debug.LogError(e);
-                        }
-                    };
-                    keyPairEntityCollectors[roomGuid].AfterEntityRemoved = async (entity) => {
-                        try {
-                            if (settings.DebugConnections) print($"Removed {entity.Id} {entity.PrefabName}");
-                            if (entityIdToNetsEntity[roomGuid].TryGetValue(entity.Id, out var e) && e != null && e.gameObject != null) {
-                                e.MarkAsDestroyedByServer();
-                                Destroy(e.gameObject);
-                            }
-                            entityIdToNetsEntity[roomGuid].Remove(entity.Id);
-                            if (entity.PrefabName == "?ClientConnection") {
-                                OnPlayersInRoomLeft?.Invoke(Guid.ParseExact(entity.GetString("AccountGuid"), "N"), Players().Count);
-                            }
-                            await Task.CompletedTask;
-                        } catch (Exception e) {
-                            Debug.LogError(e);
-                        }
-                    };
-
                 } else if (category == (byte)WorkerToClientMessageType.EntityEvent) {
-                    var roomGuid = bb.ReadGuid();
                     //print($"Got entity change for room {roomGuid:N}");
                     try {
-                        room.ApplyRootEvent(NativeEventUtils.DeserializeNativeEventType(bb));
+                        var rootEvent = NativeEventUtils.DeserializeNativeEventType(bb);
+                        if (settings.DebugConnections) Debug.Log($"Applying event: {JsonConvert.SerializeObject(rootEvent, Formatting.Indented)}");
+                        if (room == null) Debug.Log($"Room is null - whoa!");
+                        room.ApplyRootEvent(rootEvent, this);
                         // After apply events
-
+                        /*
+                        OnEntityDestroyed
+                        OnEntityCreated
+                        OnEntityPropertyChanged
+                        */
                     } catch (Exception e) {
                         Debug.LogError(e);
                     }
                 } else if (category == (byte)WorkerToClientMessageType.RoomEvent) {
-                    var roomGuid = bb.ReadGuid();
                     var accountGuid = bb.ReadGuid();
                     var eventString = bb.ReadString();
                 } else if (category == (byte)WorkerToClientMessageType.EntityRpc) {
@@ -391,7 +384,7 @@ namespace OdessaEngine.NETS.Core {
         }
         public void SendEntityEvent(NetsEntity entity, string eventString = "") {
             w.Send(BitUtils.ArrayFromStream(bos => {
-                bos.WriteByte((byte)ClientToWorkerMessageType.EntityEvent);
+                bos.WriteByte((byte)ClientToWorkerMessageType.EntityRpc);
                 bos.WriteMaybeLimitedString(entity.Model().uniqueId);
                 bos.WriteString(eventString);
             }));
@@ -404,6 +397,8 @@ namespace OdessaEngine.NETS.Core {
 
                 var changes = room.FlushEvents();
                 if (changes == null) continue;
+
+                if (settings.DebugConnections) Debug.Log($"Sending event: {JsonConvert.SerializeObject(changes, Formatting.Indented)}");
 
                 w.Send(BitUtils.ArrayFromStream(bos => {
                     bos.WriteByte((byte)ClientToWorkerMessageType.EntityEvent);
