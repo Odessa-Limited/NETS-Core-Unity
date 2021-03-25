@@ -93,9 +93,12 @@ namespace OdessaEngine.NETS.Core {
             if (conn.canSend != true) return;
             if (conn.roomGuid == null) return;
             if (conn.myAccountGuid == null) return;
+            if (networkModel != null) return; // Came from server
 
             var entityGuid = GetEntityGuid();
-            localModel = new EntityModel(new DictionaryType(), entityGuid.ToString("N"), conn.room);
+            var accountGuid = RoomServiceUtils.GetMyAccountGuid();
+            print($"Creating local model for {entityGuid}. Auth is {AuthorityEnum.Client} and current account is {accountGuid}");
+            localModel = conn.room.AddEntity(entityGuid.ToString("N"), owner: Authority == AuthorityEnum.Client ? accountGuid : new Guid(), accountGuid, prefab);
             conn.entityIdToNetsEntity.Add(entityGuid.ToString("N"), this);
             StorePropertiesToModel();
 
@@ -109,8 +112,12 @@ namespace OdessaEngine.NETS.Core {
 
                 foreach (var t in ObjectsToSync)
                     foreach (var c in t.Components)
-                        foreach (var f in c.Fields)
-                            OnFieldChange(e.Fields, f.PathName, true);
+                        foreach (var f in c.Fields.Where(f => f.Enabled))
+                            try {
+                                OnFieldChange(e.Fields, f.PathName, true);
+                            } catch (Exception ex) {
+                                Debug.LogError($"Unable to set script vars to the model ({e.PrefabName} {f.PathName}). {ex}");
+                            }
             else {
                 if (IsOwnedByMe == false && Authority == AuthorityEnum.Client) {
                     print("Expected object to have owner as me");
@@ -248,13 +255,17 @@ namespace OdessaEngine.NETS.Core {
         }
 
         public void OnFieldChange(DictionaryModel fields, string key, bool force = false) {
-            if (this == null) return;
             if (IsOwnedByMe == false || force) {
                 if (key.StartsWith(".")) {
                     var objProp = GetPropertyAtPath(key);
 
+                    if (fields.Keys().Any(f => f == key) == false) {
+                        Debug.Log($"Couldn't find {key}. Available properties: " + string.Join(", ", fields.Keys()));
+                        return;
+                    }
+
                     var obj = fields.GetObject(key, objProp.Method.PropertyType);
-                    if (objProp.Method.PropertyType.IsNetsNativeType()) {
+                    if (objProp.Method.PropertyType.IsNetsNativeType() == false) {
                         obj = JsonConvert.DeserializeObject((string)obj, objProp.Method.PropertyType);
                     }
 

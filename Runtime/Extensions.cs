@@ -64,19 +64,33 @@ namespace OdessaEngine.NETS.Core {
 
 		public static Vector2 GetVector2(this DictionaryModel dict, string key) {
 			var list = dict.GetList(key);
-			return new Vector2(list.GetNumber(0).Value, list.GetNumber(1).Value);
+			if (list == null) {
+				Debug.LogWarning("Unknown key " + key);
+				return Vector2.zero;
+			}
+			return new Vector2(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f);
 		}
+
 		public static Vector3 GetVector3(this DictionaryModel dict, string key) {
 			var list = dict.GetList(key);
-			return new Vector3(list.GetNumber(0).Value, list.GetNumber(1).Value, list.GetNumber(2).Value);
+			return new Vector3(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f);
 		}
+
 		public static Vector4 GetVector4(this DictionaryModel dict, string key) {
 			var list = dict.GetList(key);
-			return new Vector4(list.GetNumber(0).Value, list.GetNumber(1).Value, list.GetNumber(2).Value, list.GetNumber(3).Value);
+			if (list == null) {
+				Debug.LogWarning("Unknown key " + key);
+				return Vector4.zero;
+			}
+			return new Vector4(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f, list.GetNumber(3).Value / 100f);
 		}
 		public static Quaternion GetQuaternion(this DictionaryModel dict, string key) {
 			var list = dict.GetList(key);
-			return new Quaternion(list.GetNumber(0).Value, list.GetNumber(1).Value, list.GetNumber(2).Value, list.GetNumber(3).Value);
+			if (list == null) {
+				Debug.LogWarning("Unknown key " + key);
+				return Quaternion.identity;
+			}
+			return new Quaternion(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f, list.GetNumber(3).Value / 100f);
 		}
 
 		public static void SetVectorX(this ListModel list, int index, params float[] values) {
@@ -96,15 +110,15 @@ namespace OdessaEngine.NETS.Core {
 
 		public static Vector2 GetVector2(this ListModel list, int index) {
 			list = list.GetList(index);
-			return new Vector2(list.GetNumber(0).Value, list.GetNumber(1).Value);
+			return new Vector2(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f);
 		}
 		public static Vector3 GetVector3(this ListModel list, int index) {
 			list = list.GetList(index);
-			return new Vector3(list.GetNumber(0).Value, list.GetNumber(1).Value, list.GetNumber(2).Value);
+			return new Vector3(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f);
 		}
 		public static Quaternion GetQuaternion(this ListModel list, int index) {
 			list = list.GetList(index);
-			return new Quaternion(list.GetNumber(0).Value, list.GetNumber(1).Value, list.GetNumber(2).Value, list.GetNumber(3).Value);
+			return new Quaternion(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f, list.GetNumber(3).Value / 100f);
 		}
 
 		public static readonly HashSet<Type> SyncableTypes = new HashSet<Type>(){

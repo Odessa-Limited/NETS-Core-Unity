@@ -64,9 +64,13 @@ public class RoomServiceUtils : MonoBehaviour {
 
             if (needsRefresh) {
                 var webRequest = UnityWebRequest.Get($"{authUrl}/refresh?applicationGuid={settings.ApplicationGuid}&refreshToken={currentAuth.refreshToken}");
-
                 yield return webRequest.SendWebRequest();
-                HandleAuthResponse(webRequest, webRequest.downloadHandler.text);
+
+                if (HandleAuthResponse(webRequest, webRequest.downloadHandler.text) == false) {
+                    currentAuth = null;
+                    PlayerPrefs.DeleteKey(NETS_AUTH_TOKEN);
+                    EnsureAuth();
+                }
             }
 
             gettingAuth = false;
@@ -122,8 +126,8 @@ public class RoomServiceUtils : MonoBehaviour {
         CallBackOnComplete(result?.RoomState);
     }
 
-    private static void HandleAuthResponse(UnityWebRequest webRequest, string resultText) {
-        if (!TryGetObjectFromResponse(webRequest, resultText, out AuthResponse authResponse)) throw new Exception("Unable to deserialize AuthResponse");
+    private static bool HandleAuthResponse(UnityWebRequest webRequest, string resultText) {
+        if (!TryGetObjectFromResponse(webRequest, resultText, out AuthResponse authResponse)) return false;
         currentAuth = authResponse;
 
         if (settings.KeepReferenceOfAccount) {
@@ -136,6 +140,7 @@ public class RoomServiceUtils : MonoBehaviour {
         var tokenLifetime = Convert.ToInt64(tokenInfo["exp"]) - Convert.ToInt64(tokenInfo["iat"]);
         refreshTokenAt = DateTimeOffset.Now.ToUnixTimeSeconds() + tokenLifetime / 2;
         authSubject = tokenInfo["sub"];
+        return true;
     }
 
     private static Dictionary<string, string> DecodeJwt(string jwt) {
