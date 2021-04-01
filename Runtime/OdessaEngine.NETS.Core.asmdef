@@ -1,6 +1,6 @@
 {
     "name": "OdessaEngine.NETS.Core.asmdef",
-    "rootNamespace": "",
+    "rootNamespace": "OdessaEngine.NETS",
     "references": [
         "GUID:3082c70fcbbd4eb43bd7ca841aeacc41"
     ],

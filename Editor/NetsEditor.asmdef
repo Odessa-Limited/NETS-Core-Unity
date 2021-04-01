@@ -1,5 +1,6 @@
 {
-    "name": "NetsEditor",
+    "name": "OdessaEngine.NETS.Editor.asmdef",
+    "rootNamespace": "OdessaEngine.NETS",
     "references": [
         "GUID:5b4a93b305dc65f4696520d62459bd5b"
     ],
@@ -7,9 +8,11 @@
         "Editor"
     ],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Odessa.Core.dll"
+    ],
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
