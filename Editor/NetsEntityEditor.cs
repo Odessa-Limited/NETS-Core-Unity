@@ -41,7 +41,7 @@ public class NetsEntityEditor : Editor {
         EditorGUILayout.LabelField("Entity");
         EditorGUILayout.TextField(serializedObject.targetObject.name);
         EditorGUILayout.EndHorizontal();
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.EntityID)));
+        //EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.EntityID)));
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
@@ -70,12 +70,12 @@ public class NetsEntityEditor : Editor {
             RenderNewObjectTransform(objectsToSync);
         }
 
-            if (objectsToSync.isExpanded) {
-                EditorGUI.indentLevel += 1;
-        EditorGUILayout.EndVertical();
-
-        serializedObject.ApplyModifiedProperties();
-
+        if (objectsToSync.isExpanded) {
+            EditorGUI.indentLevel += 1;
+            EditorGUILayout.EndVertical();
+            serializedObject.ApplyModifiedProperties();
+        }
+        EditorGUI.indentLevel -= 1;
     }
     void RenderObject(SerializedProperty node, GameObject obj, string path = "") {
         var transform = node.FindPropertyRelative(nameof(ObjectToSync.Transform));
@@ -126,7 +126,7 @@ public class NetsEntityEditor : Editor {
         style.fontStyle = previousStyle;
         return result;
     }
-    bool TickableFoldout(SerializedProperty tickableState, bool foldoutState, string content, bool toggleOnLabelClick) {
+    static bool TickableFoldout(SerializedProperty tickableState, bool foldoutState, string content, bool toggleOnLabelClick) {
         EditorGUILayout.BeginHorizontal();
         //TODO fix up layout of the overall positioning of the tick boxes to be inline with the middle
         var style = new GUIStyle();
@@ -142,7 +142,8 @@ public class NetsEntityEditor : Editor {
         //EditorGUILayout.EndVertical();
         EditorGUILayout.EndHorizontal();
         return foldoutResult;
-	}
+    }
+    
     public static object GetTargetObjectOfProperty(SerializedProperty prop) {
         if (prop == null) return null;
 
@@ -160,7 +161,8 @@ public class NetsEntityEditor : Editor {
         }
         return obj;
     }
-    private static object GetValue_Imp(object source, string name) {
+    
+    static object GetValue_Imp(object source, string name) {
         if (source == null)
             return null;
         var type = source.GetType();
@@ -179,7 +181,7 @@ public class NetsEntityEditor : Editor {
         return null;
     }
 
-    private static object GetValue_Imp(object source, string name, int index) {
+    static object GetValue_Imp(object source, string name, int index) {
         var enumerable = GetValue_Imp(source, name) as System.Collections.IEnumerable;
         if (enumerable == null) return null;
         var enm = enumerable.GetEnumerator();
@@ -192,9 +194,6 @@ public class NetsEntityEditor : Editor {
         }
         return enm.Current;
     }
-
-                EditorGUI.indentLevel -= 1;
-            }
 
 
     void RenderObjectProperties(SerializedProperty objectProperties) {
