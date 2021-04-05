@@ -18,6 +18,11 @@ namespace OdessaEngine.NETS.Core {
 		public static bool IsServerOwned(this AuthorityEnum e) => e == AuthorityEnum.Server || e == AuthorityEnum.ServerSingleton;
 
 		public static void SetObject(this DictionaryModel dict, string key, object value) {
+			if (value == null) {
+				dict.Remove(key);
+				return;
+			}
+
 			if (value is byte b) dict.SetNumber(key, b);
 			else if (value is bool bo) dict.SetNumber(key, bo ? 1 : 0);
 			else if (value is short s) dict.SetNumber(key, s);
@@ -29,7 +34,7 @@ namespace OdessaEngine.NETS.Core {
 			else if (value is Vector3 v3) dict.SetVector3(key, v3);
 			else if (value is Vector4 v4) dict.SetVector4(key, v4);
 			else if (value is Quaternion q) dict.SetQuaternion(key, q);
-			else throw new Exception("Unknown type " + value.GetType());
+			else throw new Exception($"Unknown type for key {key}: " + value?.GetType());
 		}
 
 		public static void SetVectorX(this DictionaryModel dict, string key, params float[] values) {
@@ -73,7 +78,14 @@ namespace OdessaEngine.NETS.Core {
 
 		public static Vector3 GetVector3(this DictionaryModel dict, string key) {
 			var list = dict.GetList(key);
-			return new Vector3(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f);
+			var v0 = list.GetNumber(0);
+			var v1 = list.GetNumber(1);
+			var v2 = list.GetNumber(2);
+			if (!v0.HasValue || !v1.HasValue || !v2.HasValue) {
+				Debug.LogWarning($"Key {key} does not exist for a vector");
+				return default;
+			}
+			return new Vector3(v0.Value / 100f, v1.Value / 100f, v2.Value / 100f);
 		}
 
 		public static Vector4 GetVector4(this DictionaryModel dict, string key) {
@@ -90,7 +102,16 @@ namespace OdessaEngine.NETS.Core {
 				Debug.LogWarning("Unknown key " + key);
 				return Quaternion.identity;
 			}
-			return new Quaternion(list.GetNumber(0).Value / 100f, list.GetNumber(1).Value / 100f, list.GetNumber(2).Value / 100f, list.GetNumber(3).Value / 100f);
+
+			var v0 = list.GetNumber(0);
+			var v1 = list.GetNumber(1);
+			var v2 = list.GetNumber(2);
+			var v3 = list.GetNumber(3);
+			if (!v0.HasValue || !v1.HasValue || !v2.HasValue || !v3.HasValue) {
+				Debug.LogWarning($"Key {key} does not exist for a quaternion");
+				return default;
+			}
+			return new Quaternion(v0.Value / 100f, v1.Value / 100f, v2.Value / 100f, v3.Value / 100f);
 		}
 
 		public static void SetVectorX(this ListModel list, int index, params float[] values) {

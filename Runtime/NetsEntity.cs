@@ -12,6 +12,7 @@ using Odessa.Nets.EntityTracking.EventObjects.NativeTypes;
 #if UNITY_EDITOR
 using UnityEditor.Experimental.SceneManagement;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 #endif
 
 namespace OdessaEngine.NETS.Core {
@@ -33,6 +34,8 @@ namespace OdessaEngine.NETS.Core {
         EntityModel localModel;
         EntityModel networkModel;
         public EntityModel Model() => IsOwnedByMe ? localModel : networkModel;
+        public EntityModel LocalModel() => localModel;
+        public EntityModel NetworkModel() => networkModel;
         public NetsRoomConnection connection;
 
         private NetsRoomConnection _conn;
@@ -55,9 +58,8 @@ namespace OdessaEngine.NETS.Core {
         public bool IsReady => localModel != null;
 
         public Guid GetEntityGuid() {
-            if (Authority == AuthorityEnum.Client) return Guid.NewGuid();
-            if (Authority == AuthorityEnum.Server) return IntToGuid(GetInstanceID());
-            return IntToGuid(prefab.GetHashCode());
+            if (Authority == AuthorityEnum.ServerSingleton) return IntToGuid(prefab.GetHashCode());
+            return guid;
         }
 
         static Guid IntToGuid(int value) {
@@ -67,18 +69,22 @@ namespace OdessaEngine.NETS.Core {
         }
 
         private void Awake() {
+            CreateGuid();
 #if UNITY_EDITOR
             if (Application.isPlaying == false) return;
 #endif
-            // Deal with assignedGuids. 
-            /*
-            Comes online:
-            Client: Always generate
-            Server: Never generate
-            Singleton: Never generate
-             */
 
-            if (Authority == AuthorityEnum.ServerSingleton && conn.KnownServerSingletons.ContainsKey(prefab) == false)
+            if (networkModel == null) {
+                // I spawned this
+                if (Authority == AuthorityEnum.Client) {
+                    serializedGuid = null;
+                    CreateGuid();
+                }
+
+                NetsRoomConnection.entityIdToNetsEntity.Add(GetEntityGuid().ToString("N"), this);
+            }
+
+            if (Authority == AuthorityEnum.ServerSingleton && conn?.KnownServerSingletons?.ContainsKey(prefab) == false)
                 conn.KnownServerSingletons.Add(prefab, this);
 
             //Nets entitys don't get destroyed when changing scene
@@ -93,13 +99,15 @@ namespace OdessaEngine.NETS.Core {
             if (conn.canSend != true) return;
             if (conn.roomGuid == null) return;
             if (conn.myAccountGuid == null) return;
+            if (conn.HasJoinedRoom == false) return;
             if (networkModel != null) return; // Came from server
 
             var entityGuid = GetEntityGuid();
-            var accountGuid = RoomServiceUtils.GetMyAccountGuid();
-            print($"Creating local model for {entityGuid}. Auth is {AuthorityEnum.Client} and current account is {accountGuid}");
-            localModel = conn.room.AddEntity(entityGuid.ToString("N"), owner: Authority == AuthorityEnum.Client ? accountGuid : new Guid(), accountGuid, prefab);
-            conn.entityIdToNetsEntity.Add(entityGuid.ToString("N"), this);
+            //if (conn.entityIdToNetsEntity.ContainsKey(entityGuid.ToString("N"))) Debug.LogError("Entity conflict!");
+            //conn.entityIdToNetsEntity.Add(entityGuid.ToString("N"), this);
+
+            //print($"Creating local model for {entityGuid}. Auth is {AuthorityEnum.Client} and current account is {conn.myAccountGuid}");
+            localModel = new EntityModel(conn.room, entityGuid, Authority == AuthorityEnum.Client ? conn.myAccountGuid.Value : new Guid(), conn.myAccountGuid.Value, prefab);
             StorePropertiesToModel();
 
             //NetsNetworking.instance?.CreateFromGameObject(this);
@@ -108,15 +116,16 @@ namespace OdessaEngine.NETS.Core {
         public void OnCreatedOnServer(Guid roomGuid, EntityModel e) {
             networkModel = e;
             var shouldSetFields = IsOwnedByMe == false;
-            if (shouldSetFields)
+            GetComponentsInChildren<NetsBehavior>(true).ToList().ForEach(nb => nb.Awake());
 
+            if (shouldSetFields)
                 foreach (var t in ObjectsToSync)
                     foreach (var c in t.Components)
                         foreach (var f in c.Fields.Where(f => f.Enabled))
                             try {
                                 OnFieldChange(e.Fields, f.PathName, true);
                             } catch (Exception ex) {
-                                Debug.LogError($"Unable to set script vars to the model ({e.PrefabName} {f.PathName}). {ex}");
+                                Debug.LogError($"Unable to set script vars to the model ({e.uniqueId} {e.PrefabName} {f.PathName}). {ex}");
                             }
             else {
                 if (IsOwnedByMe == false && Authority == AuthorityEnum.Client) {
@@ -156,7 +165,7 @@ namespace OdessaEngine.NETS.Core {
         /// If this is the server and the server owns this
         /// </summary>
         public bool IsOwnedByMe => (networkModel == null && Authority == AuthorityEnum.Client) ||
-            (Authority.IsServerOwned() && conn?.IsServer == true) ||
+            (Authority.IsServerOwned() && conn?.IsServer() == true) ||
             (conn?.myAccountGuid != null && conn?.myAccountGuid == networkModel?.Owner);
 
         /// <summary>
@@ -164,9 +173,10 @@ namespace OdessaEngine.NETS.Core {
         /// </summary>
         public Guid Creator => networkModel?.Creator ?? conn.myAccountGuid ?? default;
 
-        public Guid Owner { get => Model().Owner; set => Model().Owner = value; }
+        public Guid Owner { get => Model()?.Owner ?? Guid.Empty; set => Model().Owner = value; }
 
         void OnDestroy() {
+            GuidManager.Remove(guid);
 #if UNITY_EDITOR
             if (Application.isPlaying == false) return;
 #endif
@@ -241,6 +251,10 @@ namespace OdessaEngine.NETS.Core {
         }
 
         public void LateUpdate() {
+#if UNITY_EDITOR
+            if (Application.isPlaying == false) return;
+#endif
+
             // Wait for activation
             if (!IsReady) {
                 TryCreateOnServer();
@@ -251,7 +265,8 @@ namespace OdessaEngine.NETS.Core {
             if (Time.time < lastUpdateTime + 1f / SyncFramesPerSecond) return;
             lastUpdateTime = Time.time;
 
-            StorePropertiesToModel();
+            if (networkModel != null || Authority == AuthorityEnum.Client)
+                StorePropertiesToModel();
         }
 
         public void OnFieldChange(DictionaryModel fields, string key, bool force = false) {
@@ -259,14 +274,21 @@ namespace OdessaEngine.NETS.Core {
                 if (key.StartsWith(".")) {
                     var objProp = GetPropertyAtPath(key);
 
+                    object obj;
                     if (fields.Keys().Any(f => f == key) == false) {
-                        Debug.Log($"Couldn't find {key}. Available properties: " + string.Join(", ", fields.Keys()));
-                        return;
-                    }
-
-                    var obj = fields.GetObject(key, objProp.Method.PropertyType);
-                    if (objProp.Method.PropertyType.IsNetsNativeType() == false) {
-                        obj = JsonConvert.DeserializeObject((string)obj, objProp.Method.PropertyType);
+                        // If we can't find a property, and it's a string - that means it's null
+                        if (objProp.Method.PropertyType == typeof(string)) {
+                            obj = null;
+                        } else {
+                            Debug.Log($"Couldn't find {key}. Available properties: " + string.Join(", ", fields.Keys()));
+                            return;
+                        }
+                    } else {
+                        if (objProp.Method.PropertyType.IsNetsNativeType()) {
+                            obj = fields.GetObject(key, objProp.Method.PropertyType);
+                        } else {
+                            obj = JsonConvert.DeserializeObject(fields.GetString(key), objProp.Method.PropertyType);
+                        }
                     }
 
                     // Check lerps
@@ -339,6 +361,7 @@ namespace OdessaEngine.NETS.Core {
                 if (ownershipChanged) {
                     // TODO RESET LERPS
                     if (owned) { // Gained control
+                        print("Gained control");
                         if (networkModel != null) localModel = networkModel.Clone();
 
                         foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())
@@ -464,7 +487,6 @@ namespace OdessaEngine.NETS.Core {
                         componentToSync.Fields = componentToSync.Fields.Where(f => props.Any(p => p.Name == f.FieldName)).ToList();
                     }
                     obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
-                    EditorUtility.SetDirty(gameObject);
                 }
             }
 #endif
@@ -522,6 +544,166 @@ namespace OdessaEngine.NETS.Core {
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9 });
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10 });
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        System.Guid guid = System.Guid.Empty;
+
+        // Unity's serialization system doesn't know about System.Guid, so we convert to a byte array
+        // Fun fact, we tried using strings at first, but that allocated memory and was twice as slow
+        [SerializeField]
+        private byte[] serializedGuid;
+
+
+        public bool IsGuidAssigned() {
+            return guid != System.Guid.Empty;
+        }
+
+
+        // When de-serializing or creating this component, we want to either restore our serialized GUID
+        // or create a new one.
+        void CreateGuid() {
+            // if our serialized data is invalid, then we are a new object and need a new GUID
+            if (serializedGuid == null || serializedGuid.Length != 16) {
+#if UNITY_EDITOR
+                // if in editor, make sure we aren't a prefab of some kind
+                if (IsAssetOnDisk()) {
+                    return;
+                }
+                Undo.RecordObject(this, "Added GUID");
+#endif
+                guid = System.Guid.NewGuid();
+                serializedGuid = guid.ToByteArray();
+
+#if UNITY_EDITOR
+                // If we are creating a new GUID for a prefab instance of a prefab, but we have somehow lost our prefab connection
+                // force a save of the modified prefab instance properties
+                if (PrefabUtility.IsPartOfNonAssetPrefabInstance(this)) {
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(this);
+                }
+#endif
+            } else if (guid == System.Guid.Empty) {
+                // otherwise, we should set our system guid to our serialized guid
+                guid = new System.Guid(serializedGuid);
+            }
+
+            // register with the GUID Manager so that other components can access this
+            if (guid != System.Guid.Empty) {
+                if (!GuidManager.Add(this)) {
+                    // if registration fails, we probably have a duplicate or invalid GUID, get us a new one.
+                    serializedGuid = null;
+                    guid = System.Guid.Empty;
+                    CreateGuid();
+                }
+            }
+        }
+
+#if UNITY_EDITOR
+        private bool IsEditingInPrefabMode() {
+            if (EditorUtility.IsPersistent(this)) {
+                // if the game object is stored on disk, it is a prefab of some kind, despite not returning true for IsPartOfPrefabAsset =/
+                return true;
+            } else {
+                // If the GameObject is not persistent let's determine which stage we are in first because getting Prefab info depends on it
+                var mainStage = StageUtility.GetMainStageHandle();
+                var currentStage = StageUtility.GetStageHandle(gameObject);
+                if (currentStage != mainStage) {
+                    var prefabStage = PrefabStageUtility.GetPrefabStage(gameObject);
+                    if (prefabStage != null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private bool IsAssetOnDisk() {
+            return PrefabUtility.IsPartOfPrefabAsset(this) || IsEditingInPrefabMode();
+        }
+#endif
+
+        // We cannot allow a GUID to be saved into a prefab, and we need to convert to byte[]
+        public void OnBeforeSerialize() {
+#if UNITY_EDITOR
+            // This lets us detect if we are a prefab instance or a prefab asset.
+            // A prefab asset cannot contain a GUID since it would then be duplicated when instanced.
+            if (IsAssetOnDisk()) {
+                serializedGuid = null;
+                guid = System.Guid.Empty;
+            } else
+#endif
+        {
+                if (guid != System.Guid.Empty) {
+                    serializedGuid = guid.ToByteArray();
+                }
+            }
+        }
+
+        // On load, we can go head a restore our system guid for later use
+        public void OnAfterDeserialize() {
+            if (serializedGuid != null && serializedGuid.Length == 16) {
+                guid = new System.Guid(serializedGuid);
+            }
+        }
+
+        void OnValidate() {
+#if UNITY_EDITOR
+            // similar to on Serialize, but gets called on Copying a Component or Applying a Prefab
+            // at a time that lets us detect what we are
+            if (IsAssetOnDisk()) {
+                serializedGuid = null;
+                guid = System.Guid.Empty;
+            } else
+#endif
+        {
+                CreateGuid();
+            }
+        }
+
+        // Never return an invalid GUID
+        public System.Guid GetGuid() {
+            if (guid == System.Guid.Empty && serializedGuid != null && serializedGuid.Length == 16) {
+                guid = new System.Guid(serializedGuid);
+            }
+
+            return guid;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
     }
 
    [Serializable]

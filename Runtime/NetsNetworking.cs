@@ -138,9 +138,13 @@ namespace OdessaEngine.NETS.Core {
         public static void GetAllRooms(Action<List<RoomState>> CallBack) {
             RoomServiceUtils.GetAllRooms(CallBack);
         }
-
-        public static void StartMatchMaking(MatchmakerSettings Settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<RoomState> CallBackOnComplete = null) {
-            RoomServiceUtils.InternalMatchMakerRequest(Settings, CallBackOnUpdate, CallBackOnComplete);
+            
+        public static void StartMatchMaking(MatchmakerSettings Settings, Action<MatchMakingResponse> CallBackOnUpdate = null, Action<NetsRoomConnection> CallBackOnComplete = null) {
+            instance.StartCoroutine(RoomServiceUtils.InternalMatchMakerRequest(Settings, CallBackOnUpdate,
+                (roomState) => {
+                    var conn = ConnectViaRoomState(roomState);
+                    CallBackOnComplete?.Invoke(conn);
+                }));
         }
 
     }

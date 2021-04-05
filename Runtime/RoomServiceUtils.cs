@@ -31,6 +31,7 @@ public class RoomServiceUtils : MonoBehaviour {
     private static bool gettingAuth = false;
 
     public static Guid GetMyAccountGuid() => authSubject != null ? Guid.ParseExact(authSubject, "N") : default;
+    public static string GetMyAccountJWT() => currentAuth.accessToken;
 
     internal static IEnumerator EnsureAuth() {
         var needsToken = currentAuth == null;
@@ -57,6 +58,7 @@ public class RoomServiceUtils : MonoBehaviour {
                 } else {
                     var webRequest = UnityWebRequest.Get($"{authUrl}/createAnonUser?applicationGuid={settings.ApplicationGuid}");
                     yield return webRequest.SendWebRequest();
+                    while (webRequest.isDone == false) yield return new WaitForSecondsRealtime(0.05f); // 50ms
                     HandleAuthResponse(webRequest, webRequest.downloadHandler.text);
                     needsRefresh = false;
                 }
@@ -76,16 +78,21 @@ public class RoomServiceUtils : MonoBehaviour {
             gettingAuth = false;
         }
     }
+    internal static void EnsureAuthSync() {
+        var authFunc = EnsureAuth();
+        while (authFunc.MoveNext());
+    }
 
     protected static bool TryGetObjectFromResponse<T>(UnityWebRequest req, string response, out T obj) {
         obj = default;
         if (req.responseCode == 401) {
+            Debug.LogError($"NETS Error - unauthorized. Code: {req.responseCode} Error: {response}");
             refreshTokenAt = -1;
             return false;
         }
         if (req.responseCode != 200) {
             //This should probably send a notification to our channels via webhook
-            Debug.LogError($"NETS Error on server contact devs. Code: {req.responseCode} Error: {response}");
+            Debug.LogError($"NETS Error on server, contact devs. Code: {req.responseCode} Error: {response}");
             return false;
         }
 
@@ -93,7 +100,7 @@ public class RoomServiceUtils : MonoBehaviour {
             obj = JsonConvert.DeserializeObject<T>(response);
             return true;
         } catch (Exception e) {
-            Debug.LogError($"NETS format error on server contact devs, Error: {e} Response: {response}");
+            Debug.LogError($"NETS format error on server, contact devs, Error: {e} Response: {response}");
             return false;
         }
     }
@@ -105,7 +112,7 @@ public class RoomServiceUtils : MonoBehaviour {
         MatchMakingResponse result = default;
         while (matchMakingState != MatchMakingState.IN_GAME) {
             var requestComplete = false;
-
+            
             yield return EnsureAuth();
             var toUseUrl = $"{roomserviceUrl}/matchMakerRequest?accountToken={currentAuth.accessToken}&settings={JsonConvert.SerializeObject(settings)}&pings={JsonConvert.SerializeObject(regionalPings)}";
             var webRequest = UnityWebRequest.Get(toUseUrl);
@@ -120,8 +127,8 @@ public class RoomServiceUtils : MonoBehaviour {
                 result = matchMakingResponse;
                 requestComplete = true;
             }));
-            yield return new WaitUntil(() => requestComplete);
-            yield return new WaitForSeconds(2);
+            while (!requestComplete) yield return new WaitForSecondsRealtime(0.05f);
+            yield return new WaitForSecondsRealtime(2);
         }
         CallBackOnComplete(result?.RoomState);
     }
@@ -170,6 +177,8 @@ public class RoomServiceUtils : MonoBehaviour {
     }
 
     internal static void GetAllRooms(Action<List<RoomState>> CallBack) {
+        EnsureAuthSync();
+
         var webRequest = UnityWebRequest.Get($"{roomserviceUrl}/listRooms?token={settings.ApplicationGuid}");
         NetsNetworking.instance.StartCoroutine(SendOnWebRequestComplete(webRequest, (resultText) => {
             if (!TryGetObjectFromResponse(webRequest, resultText, out List<RoomState> roomStates)) {

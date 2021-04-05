@@ -23,7 +23,7 @@ namespace OdessaEngine.NETS.Core {
         public Action<int> OnPlayerCountChange; // TODO
 
 
-        public bool IsServer = false;
+        public bool IsServer() => room?.ServerAccount == RoomServiceUtils.GetMyAccountGuid().ToString("N");
         public Guid? myAccountGuid { get; set; } = null;
         public Guid? roomGuid = null;
 
@@ -39,19 +39,19 @@ namespace OdessaEngine.NETS.Core {
 
         private NETSSettings settings => NETSSettings.instance;
         private MonoBehaviour monoRef = NetsNetworking.instance;
-        void print(string s) => MonoBehaviour.print(s);
         Coroutine StartCoroutine(IEnumerator e) => monoRef.StartCoroutine(e);
 
         public NetsRoomConnection(RoomState roomState) {
+            RoomServiceUtils.EnsureAuthSync();
             myAccountGuid = RoomServiceUtils.GetMyAccountGuid();
-            print("Got account Guid");
 
             var protocol = roomState.ip.Contains(":125") ? "wss" : "ws";
             StartCoroutine(connect($"{protocol}://{roomState.ip}"));
             StartCoroutine(WaitUntilConnected(() => {
                 var sendData = BitUtils.ArrayFromStream(bos => {
                     bos.WriteByte((byte)ClientToWorkerMessageType.JoinRoom);
-                    bos.WriteString(roomState.token);
+                    bos.WriteString(RoomServiceUtils.GetMyAccountJWT());
+                    bos.WriteGuid(Guid.ParseExact(roomState.token, "N"));
                 });
                 w.Send(sendData);
             }));
@@ -59,31 +59,31 @@ namespace OdessaEngine.NETS.Core {
         }
 
         IEnumerator connect(string url) {
-            if (settings.DebugConnections) print($"Connecting to {url}");
+            if (settings.DebugConnections) Debug.Log($"Connecting to {url}");
             intentionallyDisconnected = false;
             if (connected) {
-                if (settings.DebugConnections)  print("Already connected");
+                if (settings.DebugConnections)  Debug.Log("Already connected");
                 yield break;
             }
             WebSocket conn = new WebSocket(new Uri(url));
-            if (settings.DebugConnections) print("Attempting connection to game server on " + url);
+            if (settings.DebugConnections) Debug.Log("Attempting connection to game server on " + url);
 
             if (w != null || connected) {
-                if (settings.DebugConnections) print("Closing websocket");
+                if (settings.DebugConnections) Debug.Log("Closing websocket");
                 conn.Close();
                 yield return new WaitForSeconds(0.02f);
             }
 
             conn = new WebSocket(new Uri(url));
 
-            if (settings.DebugConnections) print("waiting for ready");
+            if (settings.DebugConnections) Debug.Log("waiting for ready");
             while (conn.isReady == false) {
                 yield return new WaitForSeconds(.03f); // Wait for iframe to postback
             }
 
-            if (settings.DebugConnections) print("attempting connect");
+            if (settings.DebugConnections) Debug.Log("attempting connect");
             yield return StartCoroutine(conn.Connect());
-            if (settings.DebugConnections) print("Connected to game server? " + conn.isConnected);
+            if (settings.DebugConnections) Debug.Log("Connected to game server? " + conn.isConnected);
             yield return new WaitForSeconds(.2f);
 
             bool valid = true;
@@ -91,13 +91,13 @@ namespace OdessaEngine.NETS.Core {
                 yield return new WaitForSeconds(.02f);
                 valid = false;
                 if (intentionallyDisconnected) yield break;
-                if (settings.DebugConnections) print("Attempting reconnect...");
+                if (settings.DebugConnections) Debug.Log("Attempting reconnect...");
                 if (!connected)
                     StartCoroutine(connect(url));
                 yield break;
             }
             if (connected) {
-                if (settings.DebugConnections) print("Too late for " + url);
+                if (settings.DebugConnections) Debug.Log("Too late for " + url);
                 conn.Close(); // Too late
                 yield break;
             }
@@ -105,9 +105,9 @@ namespace OdessaEngine.NETS.Core {
             w = conn;
             connected = true;
             room = new RoomModel();
-            entityIdToNetsEntity.Clear();
+            //entityIdToNetsEntity.Clear(); // TODO CLEAR MY ENTITIES
             StartCoroutine(SendChanges());
-            if (settings.DebugConnections) print("Debug: valid: " + valid + " , connected " + connected);
+            if (settings.DebugConnections) Debug.Log("Debug: valid: " + valid + " , connected " + connected);
 
             //listener.OnConnected();
             HasJoinedRoom = false;
@@ -118,7 +118,7 @@ namespace OdessaEngine.NETS.Core {
             KnownServerSingletons.Clear();
             while (valid) {
                 if (!w.isConnected) {
-                    if (!intentionallyDisconnected) print("ws error!");
+                    if (!intentionallyDisconnected) Debug.Log("ws error!");
                     valid = false;
                     connected = false;
                     oldConnected = false;
@@ -148,7 +148,7 @@ namespace OdessaEngine.NETS.Core {
             w.Close();
         }
 
-        public List<EntityModel> Players() {
+        public List<ConnectionModel> Players() {
             return room.ClientConnectionModels.Values.ToList();
         }
 
@@ -165,7 +165,7 @@ namespace OdessaEngine.NETS.Core {
                     MonoBehaviour.Destroy(e.gameObject);
             }
 
-            entityIdToNetsEntity.Clear();
+            entityIdToNetsEntity.Clear(); // TODO CLEAR MY ENTITIES
             room = new RoomModel();
             KnownServerSingletons.Clear();
 
@@ -179,10 +179,10 @@ namespace OdessaEngine.NETS.Core {
 
         bool connected = false;
         public RoomModel room;
-        public Dictionary<string, NetsEntity> entityIdToNetsEntity = new Dictionary<string, NetsEntity>();
+        public static Dictionary<string, NetsEntity> entityIdToNetsEntity = new Dictionary<string, NetsEntity>();
 
         bool initializedSingletons = false;
-        bool HasJoinedRoom = false;
+        public bool HasJoinedRoom = false;
         IEnumerator HandlePacketWithDelay(byte[] data) {
             if (settings.DebugLatencyMs > 0)
                 yield return new WaitForSeconds(settings.DebugLatencyMs / 1000f);
@@ -190,11 +190,19 @@ namespace OdessaEngine.NETS.Core {
         }
 
         public void OnEntityDestroyed(EntityModel entity) {
+            if (entity == null) {
+                Debug.LogWarning("Null entity in OnEntityDestroyed");
+                return;
+            }
             try {
-                if (settings.DebugConnections) print($"Removed {entity.uniqueId} {entity.PrefabName}");
-                if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e) && e != null && e.gameObject != null) {
-                    e.MarkAsDestroyedByServer();
-                    MonoBehaviour.Destroy(e.gameObject);
+                //Debug.Log($"Removed {entity.uniqueId} {entity.PrefabName}");
+                if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e)) {
+                    if (e != null) {
+                        e.MarkAsDestroyedByServer();
+                        if (e.gameObject != null) MonoBehaviour.Destroy(e.gameObject);
+                    }
+                } else {
+                    if (settings.DebugConnections) Debug.LogWarning($"Tried to remove {entity.uniqueId} but it didn't exist");
                 }
                 entityIdToNetsEntity.Remove(entity.uniqueId);
                 /*
@@ -209,20 +217,21 @@ namespace OdessaEngine.NETS.Core {
 
         public void OnEntityCreated(EntityModel entity) {
             try {
-                if (settings.DebugConnections) print($"Created entity {entity.uniqueId}: {entity.PrefabName} - Model exists: {entity != null}");
 
                 entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var matchedEntity);
                 if (matchedEntity != null) {
                     matchedEntity.OnCreatedOnServer(roomGuid.Value, entity);
-                    matchedEntity.Owner = entity.Owner;
+                    //if (settings.DebugConnections) Debug.Log($"Found existing entity {entity.uniqueId}: {entity.PrefabName}");
+                    return;
                 }
+                //if (settings.DebugConnections) Debug.Log($"Created entity {entity.uniqueId}: {entity.PrefabName}");
 
                 NETSNetworkedTypesLists.instance.NetworkedTypesLookup.TryGetValue(entity.PrefabName, out var typeToCreate);
                 if (typeToCreate == null) {
-                    print("Unable to find object " + entity.uniqueId+ " " + entity.PrefabName);
+                    Debug.Log("Unable to find object " + entity.uniqueId+ " " + entity.PrefabName);
                 }
 
-                if (IsServer && KnownServerSingletons.ContainsKey(typeToCreate.name)) {
+                if (IsServer() && KnownServerSingletons.ContainsKey(typeToCreate.name)) {
                     throw new Exception($"Did not create new {typeToCreate.name} as we are server and already have one!");
                 }
 
@@ -243,17 +252,16 @@ namespace OdessaEngine.NETS.Core {
 
         public void AfterEventsApplied() {
             try {
-                if (IsServer && !initializedSingletons) {
+                if (IsServer() && !initializedSingletons) {
+                    if (settings.DebugConnections) Debug.Log("Initiating singletons");
                     foreach (var s in NETSNetworkedTypesLists.instance.ServerSingletonsList)
                         if (KnownServerSingletons.ContainsKey(s.name) == false) {
-                            Debug.Log("Init prefab for singleton");
+                            if (settings.DebugConnections) Debug.Log($"Init prefab for singleton: {s.name}");
                             MonoBehaviour.Instantiate(s.prefab);
                         }
                     initializedSingletons = true;
                 }
-                if (HasJoinedRoom == false) {
-                    HasJoinedRoom = true;
-                }
+                HasJoinedRoom = true;
             } catch (Exception e) {
                 Debug.LogError(e);
             }
@@ -261,13 +269,17 @@ namespace OdessaEngine.NETS.Core {
 
         public void OnEntityPropertyChanged(EntityModel entity, string key) {
             try {
-                //print($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
+                if (entity == null) {
+                    Debug.LogWarning("No entity in OnEntityPropertyChanged!?");
+                    return;
+                }
+                //Debug.Log($"room: {roomGuid:N} Updated {entity.Id}.{entity.PrefabName}: [{field.Name}] => {field.Value}");
                 /*
                 if (entity.Id == 1) {
                     if (entity.PrefabName != "?Room") throw new Exception("Expected room as entity ID 1");
                     if (field.Name == "ServerAccount") {
                         IsServer = myAccountGuid == Guid.ParseExact(entity.GetString("ServerAccount"), "N");
-                        if (settings.DebugConnections) print($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
+                        if (settings.DebugConnections) Debug.Log($"ServerAccount: {entity.GetString("ServerAccount")} ({(IsServer ? "" : "not ")}me)");
 
                         if (IsServer == false) {
                             var startingEnts = NetsNetworking.FindObjectsOfType<NetsEntity>();
@@ -275,7 +287,7 @@ namespace OdessaEngine.NETS.Core {
                                 .Where(e => e.Authority.IsServerOwned() && e.Id == 0)
                                 .ToList();
                             if (settings.DebugConnections) {
-                                print($"Found {localServerEntities.Count} server entities to destroy as we are not server. {string.Join(",", localServerEntities.Select(e => e.prefab))}");
+                                Debug.Log($"Found {localServerEntities.Count} server entities to destroy as we are not server. {string.Join(",", localServerEntities.Select(e => e.prefab))}");
                             }
                             localServerEntities.ForEach(e => {
                                 var comp = e.GetComponent<NetsEntity>();
@@ -289,13 +301,16 @@ namespace OdessaEngine.NETS.Core {
                     return;
                 }
                 */
+                
                 if (key.StartsWith("Fields.")) key = key.Substring(7);
 
                 if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e)) {
+                    if (e.LocalModel() != null && e.LocalModel() == entity) Debug.LogError("Found local model! " + (e.LocalModel() == e.NetworkModel()));
                     e.OnFieldChange(entity.Fields, key);
                 } else {
-                    print("Unknown entity: " + entity.uniqueId);
+                    Debug.Log("Unknown entity: " + entity.uniqueId);
                 }
+                
             } catch (Exception e) {
                 Debug.LogError(e);
             }
@@ -307,7 +322,7 @@ namespace OdessaEngine.NETS.Core {
                 var bb = new BitBuffer(data);
                 var category = bb.getByte();
                 //if (category != (byte)ProxyToUnityMessageType.Ping)
-                //print($"Got category: {category}");
+                //Debug.Log($"Got category: {category}");
 
                 if (category == (byte)WorkerToClientMessageType.Ping) {
                     Guid requestId = bb.ReadGuid();
@@ -318,13 +333,14 @@ namespace OdessaEngine.NETS.Core {
                     if (settings.DebugConnections) Debug.Log($"NETS - Joined Room ID {roomGuid}");
                     room = new RoomModel();
                 } else if (category == (byte)WorkerToClientMessageType.EntityEvent) {
-                    //print($"Got entity change for room {roomGuid:N}");
+                    //Debug.Log($"Got entity change for room {roomGuid:N}");
                     try {
                         var rootEvent = NativeEventUtils.DeserializeNativeEventType(bb);
                         if (settings.DebugConnections) Debug.Log($"Applying event: {JsonConvert.SerializeObject(rootEvent, Formatting.Indented)}\n{Convert.ToBase64String(BitUtils.ArrayFromStream(bos => rootEvent.Serialize(bos, EntitySerializationContext.Admin)))}");
                         room.ApplyRootEvent(rootEvent, this, false);
                     } catch (Exception e) {
                         Debug.LogError(e);
+                        Debug.LogError(Convert.ToBase64String(data.ToList().Skip(1).ToArray()));
                     }
                 } else if (category == (byte)WorkerToClientMessageType.RoomEvent) {
                     var accountGuid = bb.ReadGuid();
@@ -389,7 +405,7 @@ namespace OdessaEngine.NETS.Core {
                 var changes = room.FlushEvents();
                 if (changes == null) continue;
 
-                if (settings.DebugConnections) Debug.Log($"Sending event: {JsonConvert.SerializeObject(changes, Formatting.Indented)}\n{Convert.ToBase64String(BitUtils.ArrayFromStream(bos => changes.Serialize(bos, EntitySerializationContext.Admin)))}");
+                //if (settings.DebugConnections) Debug.Log($"Sending event: {JsonConvert.SerializeObject(changes, Formatting.Indented)}\n{Convert.ToBase64String(BitUtils.ArrayFromStream(bos => changes.Serialize(bos, EntitySerializationContext.Admin)))}");
 
                 w.Send(BitUtils.ArrayFromStream(bos => {
                     bos.WriteByte((byte)ClientToWorkerMessageType.EntityEvent);
