@@ -10,6 +10,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 namespace OdessaEngine.NETS.Core {
@@ -20,6 +21,7 @@ namespace OdessaEngine.NETS.Core {
 
         public Action<bool> OnConnect;
         public Action<bool> OnIsServer;
+        public Action AfterServerUpdate;
         public Action<int> OnPlayerCountChange; // TODO
 
 
@@ -190,10 +192,12 @@ namespace OdessaEngine.NETS.Core {
         }
 
         public void OnEntityDestroyed(EntityModel entity) {
+
             if (entity == null) {
                 Debug.LogWarning("Null entity in OnEntityDestroyed");
                 return;
             }
+            Debug.Log("Destroy entity " + entity.uniqueId);
             try {
                 //Debug.Log($"Removed {entity.uniqueId} {entity.PrefabName}");
                 if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e)) {
@@ -336,7 +340,15 @@ namespace OdessaEngine.NETS.Core {
                     //Debug.Log($"Got entity change for room {roomGuid:N}");
                     try {
                         var rootEvent = NativeEventUtils.DeserializeNativeEventType(bb);
-                        if (settings.DebugConnections) Debug.Log($"Applying event: {JsonConvert.SerializeObject(rootEvent, Formatting.Indented)}\n{Convert.ToBase64String(BitUtils.ArrayFromStream(bos => rootEvent.Serialize(bos, EntitySerializationContext.Admin)))}");
+                        if (settings.DebugConnections) {
+                            var bytes = BitUtils.ArrayFromStream(bos => rootEvent.Serialize(bos, EntitySerializationContext.Admin));
+                            if (settings.DebugConnections) Debug.Log($"Applying event ({bytes.Length}): {Convert.ToBase64String(bytes)}");
+
+                            var sb = new StringBuilder();
+                            rootEvent.PrettyPrint(sb, 0);
+                            if (settings.DebugConnections) Debug.Log($"Applying event: {sb}");
+                        }
+                        
                         room.ApplyRootEvent(rootEvent, this, false);
                     } catch (Exception e) {
                         Debug.LogError(e);
@@ -360,6 +372,7 @@ namespace OdessaEngine.NETS.Core {
                         Debug.LogError(e);
                     }
                 }
+                AfterServerUpdate?.Invoke();
             } catch (Exception e) {
                 OnConnect?.Invoke(false);
                 Debug.LogError(e);
