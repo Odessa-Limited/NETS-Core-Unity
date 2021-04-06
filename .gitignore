@@ -2,4 +2,5 @@
 #    folder   #
 ###############
 *.pdb
+*.meta
 version.txt
