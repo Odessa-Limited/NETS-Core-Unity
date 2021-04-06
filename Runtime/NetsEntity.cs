@@ -185,7 +185,7 @@ namespace OdessaEngine.NETS.Core {
                 return;
             }
             if (destroyedByServer == false) {
-                localModel.Remove();
+                localModel?.Remove();
             }
         }
 

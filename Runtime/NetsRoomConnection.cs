@@ -193,7 +193,7 @@ namespace OdessaEngine.NETS.Core {
         public void OnEntityDestroyed(EntityModel entity) {
 
             if (entity == null) {
-                Debug.LogWarning("Null entity in OnEntityDestroyed");
+                Debug.LogWarning("Null entity in OnEntityDestroyed - I probably destroyed this one.");
                 return;
             }
             //Debug.Log("Destroy entity " + entity.uniqueId);
@@ -248,9 +248,9 @@ namespace OdessaEngine.NETS.Core {
                 typeToCreate.prefab.SetActive(false);
                 var keys = entity.Fields.Keys();
                 var positionKey = $".{entity.PrefabName}.Transform.position";
-                var rotationKey = $".{entity.PrefabName}.Transform.localRotation";
+                var rotationKey = $".{entity.PrefabName}.Transform.rotation";
                 var pos = keys.Contains(positionKey) ? entity.Fields.GetVector3(positionKey) : Vector3.zero;
-                var rot = keys.Contains(positionKey) ? entity.Fields.GetQuaternion(rotationKey) : Quaternion.identity;
+                var rot = keys.Contains(rotationKey) ? entity.Fields.GetQuaternion(rotationKey) : Quaternion.identity;
                 var newGo = MonoBehaviour.Instantiate(typeToCreate.prefab, pos, rot);
                 typeToCreate.prefab.SetActive(true);
 
