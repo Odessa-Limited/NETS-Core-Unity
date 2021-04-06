@@ -361,7 +361,6 @@ namespace OdessaEngine.NETS.Core {
                 if (ownershipChanged) {
                     // TODO RESET LERPS
                     if (owned) { // Gained control
-                        print("Gained control");
                         if (networkModel != null) localModel = networkModel.Clone();
 
                         foreach (var c in transform.GetComponentsInChildren<NetsBehavior>())

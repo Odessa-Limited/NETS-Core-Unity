@@ -20,7 +20,6 @@ namespace OdessaEngine.NETS.Core {
         public Action<Guid, int> OnPlayersInRoomJoined;
 
         public Action<bool> OnConnect;
-        public Action<bool> OnIsServer;
         public Action AfterServerUpdate;
         public Action<int> OnPlayerCountChange; // TODO
 
@@ -197,13 +196,20 @@ namespace OdessaEngine.NETS.Core {
                 Debug.LogWarning("Null entity in OnEntityDestroyed");
                 return;
             }
-            Debug.Log("Destroy entity " + entity.uniqueId);
+            //Debug.Log("Destroy entity " + entity.uniqueId);
             try {
                 //Debug.Log($"Removed {entity.uniqueId} {entity.PrefabName}");
                 if (entityIdToNetsEntity.TryGetValue(entity.uniqueId, out var e)) {
                     if (e != null) {
                         e.MarkAsDestroyedByServer();
-                        if (e.gameObject != null) MonoBehaviour.Destroy(e.gameObject);
+                        if (e.gameObject != null) {
+                            MonoBehaviour.Destroy(e.gameObject);
+                            //if (settings.DebugConnections) Debug.Log($"Destroying gameobject");
+                        } else {
+                            if (settings.DebugConnections) Debug.LogWarning($"Tried to remove {entity.uniqueId} but it didn't have a gameobject");
+                        }
+                    } else {
+                        if (settings.DebugConnections) Debug.LogWarning($"Tried to remove {entity.uniqueId} but it's related nets entity is null");
                     }
                 } else {
                     if (settings.DebugConnections) Debug.LogWarning($"Tried to remove {entity.uniqueId} but it didn't exist");
@@ -240,7 +246,12 @@ namespace OdessaEngine.NETS.Core {
                 }
 
                 typeToCreate.prefab.SetActive(false);
-                var newGo = MonoBehaviour.Instantiate(typeToCreate.prefab, new Vector3(0, 0, 0), Quaternion.Euler(0, 0, 0));
+                var keys = entity.Fields.Keys();
+                var positionKey = $".{entity.PrefabName}.Transform.position";
+                var rotationKey = $".{entity.PrefabName}.Transform.localRotation";
+                var pos = keys.Contains(positionKey) ? entity.Fields.GetVector3(positionKey) : Vector3.zero;
+                var rot = keys.Contains(positionKey) ? entity.Fields.GetQuaternion(rotationKey) : Quaternion.identity;
+                var newGo = MonoBehaviour.Instantiate(typeToCreate.prefab, pos, rot);
                 typeToCreate.prefab.SetActive(true);
 
                 newGo.GetComponentsInChildren<NetsBehavior>().ToList().ForEach(b => b.TryInitialize());

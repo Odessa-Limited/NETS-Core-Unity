@@ -16,7 +16,6 @@ namespace OdessaEngine.NETS.Core {
         public static Action<Guid> OnLeaveRoom;
 
         public static Action<Guid, bool> OnConnect;
-        public static Action<Guid, bool> OnIsServer;
         public static Action<Guid, int> OnPlayerCountChange;
         public static Action<Guid> AfterServerUpdate;
 
@@ -70,7 +69,6 @@ namespace OdessaEngine.NETS.Core {
             var connection = new NetsRoomConnection(stateToJoin);
 
             connection.OnConnect += (connected) => OnConnect?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), connected);
-            connection.OnIsServer += (connected) => OnIsServer?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), connected);
             connection.OnPlayerCountChange += (count) => OnPlayerCountChange?.Invoke(Guid.ParseExact(stateToJoin.token, "N"), count);
             connection.AfterServerUpdate += () => AfterServerUpdate?.Invoke(Guid.ParseExact(stateToJoin.token, "N"));
 
