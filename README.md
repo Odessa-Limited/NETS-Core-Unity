@@ -20,8 +20,8 @@
     }
   ],
   "dependencies": {
-    "jillejr.newtonsoft.json-for-unity": "12.0.302",
-    "com.odessa.nets.core": "0.0.106",
+    "jillejr.newtonsoft.json-for-unity": "13.0.102",
+    "com.odessa.nets.core": "0.0.109",
     ...
     }
 }
