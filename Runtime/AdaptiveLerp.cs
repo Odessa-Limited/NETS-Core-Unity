@@ -2,10 +2,10 @@
 
 namespace OdessaEngine.NETS.Core {
 	public enum LerpType {
-		None,
-		Velocity,
-		Smooth,
-		Linear,
+		None = 0,
+		Velocity = 1,
+		Smooth =2,
+		Linear =3,
 	}
 
 	public abstract class AdaptiveLerp<T> {

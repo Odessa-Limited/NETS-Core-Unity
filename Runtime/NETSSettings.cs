@@ -1,5 +1,7 @@
 ﻿using System;
 using UnityEngine;
+using System.Collections.Generic;
+using System.Reflection;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -28,6 +30,7 @@ namespace OdessaEngine.NETS.Core {
 		[Range(0, 500)]
 		public float DebugLatencyMs = 0f;
 
+
 		private static NETSSettings _instance;
 		public static NETSSettings instance {
 			get {
@@ -49,5 +52,12 @@ namespace OdessaEngine.NETS.Core {
 			}
 		}
 
+	}
+
+	public class Vector3LerpingObjectProperty : ObjectProperty {
+		public Vector3AdaptiveLerp Lerp { get; set; }
+	}
+	public class QuaternionLerpingObjectProperty : ObjectProperty {
+		public QuaternionAdaptiveLerp Lerp { get; set; }
 	}
 }

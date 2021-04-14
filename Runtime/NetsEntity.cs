@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿
+using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 using System;
@@ -18,47 +19,72 @@ using UnityEditor.SceneManagement;
 namespace OdessaEngine.NETS.Core {
     [ExecuteAlways]
     public class NetsEntity : MonoBehaviour {
-        public List<ObjectToSync> ObjectsToSync = new List<ObjectToSync>();
-        public Transform addedTransform;
+    #region User editable
 
-        [Range(0.0f, 20.0f)]
-        public float SyncFramesPerSecond = 1f;
+        public List<ObjectToSync> ObjectsToSync => entitySetting.ObjectsToSync;
+        public float SyncFramesPerSecond => entitySetting.SyncFramesPerSecond;
+        public AuthorityEnum Authority => entitySetting.Authority;
+        private EntitySetting _entitySetting = null;
+        private EntitySetting entitySetting {
+            get {
+                _entitySetting = NETSNetworkedTypesLists.instance.EntitySettings.Where(o => o.lookup == prefab).FirstOrDefault();
 
-        public AuthorityEnum Authority;
-
+                if (_entitySetting == default) {
+                    _entitySetting = new EntitySetting() { lookup = prefab };
+                    NETSNetworkedTypesLists.instance.EntitySettings.Add(_entitySetting);
+                }
+                return _entitySetting;
+            }
+            set {
+                _entitySetting = NETSNetworkedTypesLists.instance.EntitySettings[NETSNetworkedTypesLists.instance.EntitySettings.IndexOf(_entitySetting)] = value;
+            }
+        }
+        #endregion
+        #region Runtime
+        /// <summary>
+        /// Use to check if the local account is the owner of this entity
+        /// OR 
+        /// If this is the server and the server owns this
+        /// </summary>
+        public bool IsOwnedByMe => (networkModel == null && entitySetting.Authority == AuthorityEnum.Client) ||
+            (entitySetting.Authority.IsServerOwned() && connection?.IsServer() == true) ||
+            (connection?.myAccountGuid != null && connection?.myAccountGuid == networkModel?.Owner);
+        /// <summary>
+        /// Use to check if the local account was the creator of this entity
+        /// </summary>
+        Guid Creator => networkModel?.Creator ?? connection.myAccountGuid ?? default;
+        public Guid Owner { get => Model()?.Owner ?? Guid.Empty; set => Model().Owner = value; }
         bool destroyedByServer = false;
         public void MarkAsDestroyedByServer() => destroyedByServer = true;
-
         public bool hasStarted = false;
-
         EntityModel localModel;
         EntityModel networkModel;
         public EntityModel Model() => IsOwnedByMe ? localModel : networkModel;
         public EntityModel LocalModel() => localModel;
         public EntityModel NetworkModel() => networkModel;
-        public NetsRoomConnection connection;
-
-        private NetsRoomConnection _conn;
-        public NetsRoomConnection conn {
+        private NetsRoomConnection _connection;
+        public NetsRoomConnection connection {
             get {
-                if (_conn == null) _conn = NetsNetworking
+                if (_connection == null) _connection = NetsNetworking
                     .GetConnections()
                     .SingleOrDefault(); // Multi-room is not yet supported
 
-                return _conn;
+                return _connection;
             }
             set {
-                _conn = value;
+                _connection = value;
             }
         }
-
+        public bool IsReady => localModel != null;
+        #endregion
+        #region Editor related
         [HideInInspector]
         public string prefab;
-
-        public bool IsReady => localModel != null;
+        public Transform addedTransform;
+        #endregion
 
         public Guid GetEntityGuid() {
-            if (Authority == AuthorityEnum.ServerSingleton) return IntToGuid(prefab.GetHashCode());
+            if (entitySetting.Authority == AuthorityEnum.ServerSingleton) return IntToGuid(prefab.GetHashCode());
             return guid;
         }
 
@@ -76,7 +102,7 @@ namespace OdessaEngine.NETS.Core {
 
             if (networkModel == null) {
                 // I spawned this
-                if (Authority == AuthorityEnum.Client) {
+                if (entitySetting.Authority == AuthorityEnum.Client) {
                     serializedGuid = null;
                     CreateGuid();
                 }
@@ -84,8 +110,8 @@ namespace OdessaEngine.NETS.Core {
                 NetsRoomConnection.entityIdToNetsEntity.Add(GetEntityGuid().ToString("N"), this);
             }
 
-            if (Authority == AuthorityEnum.ServerSingleton && conn?.KnownServerSingletons?.ContainsKey(prefab) == false)
-                conn.KnownServerSingletons.Add(prefab, this);
+            if (entitySetting.Authority == AuthorityEnum.ServerSingleton && connection?.KnownServerSingletons?.ContainsKey(prefab) == false)
+                connection.KnownServerSingletons.Add(prefab, this);
 
             //Nets entitys don't get destroyed when changing scene
             DontDestroyOnLoad(gameObject);
@@ -95,11 +121,11 @@ namespace OdessaEngine.NETS.Core {
 
         void TryCreateOnServer() {
             if (IsReady) return;
-            if (conn == null) return;
-            if (conn.canSend != true) return;
-            if (conn.roomGuid == null) return;
-            if (conn.myAccountGuid == null) return;
-            if (conn.HasJoinedRoom == false) return;
+            if (connection == null) return;
+            if (connection.canSend != true) return;
+            if (connection.roomGuid == null) return;
+            if (connection.myAccountGuid == null) return;
+            if (connection.HasJoinedRoom == false) return;
             if (networkModel != null) return; // Came from server
 
             var entityGuid = GetEntityGuid();
@@ -107,7 +133,7 @@ namespace OdessaEngine.NETS.Core {
             //conn.entityIdToNetsEntity.Add(entityGuid.ToString("N"), this);
 
             //print($"Creating local model for {entityGuid}. Auth is {AuthorityEnum.Client} and current account is {conn.myAccountGuid}");
-            localModel = new EntityModel(conn.room, entityGuid, Authority == AuthorityEnum.Client ? conn.myAccountGuid.Value : new Guid(), conn.myAccountGuid.Value, prefab);
+            localModel = new EntityModel(connection.room, entityGuid, entitySetting.Authority == AuthorityEnum.Client ? connection.myAccountGuid.Value : new Guid(), connection.myAccountGuid.Value, prefab);
             StorePropertiesToModel();
 
             //NetsNetworking.instance?.CreateFromGameObject(this);
@@ -119,7 +145,7 @@ namespace OdessaEngine.NETS.Core {
             GetComponentsInChildren<NetsBehavior>(true).ToList().ForEach(nb => nb.Awake());
 
             if (shouldSetFields)
-                foreach (var t in ObjectsToSync)
+                foreach (var t in entitySetting.ObjectsToSync)
                     foreach (var c in t.Components)
                         foreach (var f in c.Fields.Where(f => f.Enabled))
                             try {
@@ -128,7 +154,7 @@ namespace OdessaEngine.NETS.Core {
                                 Debug.LogError($"Unable to set script vars to the model ({e.uniqueId} {e.PrefabName} {f.PathName}). {ex}");
                             }
             else {
-                if (IsOwnedByMe == false && Authority == AuthorityEnum.Client) {
+                if (IsOwnedByMe == false && entitySetting.Authority == AuthorityEnum.Client) {
                     print("Expected object to have owner as me");
                 }
             }
@@ -159,22 +185,6 @@ namespace OdessaEngine.NETS.Core {
             NetsStart();
         }
 
-        /// <summary>
-        /// Use to check if the local account is the owner of this entity
-        /// OR 
-        /// If this is the server and the server owns this
-        /// </summary>
-        public bool IsOwnedByMe => (networkModel == null && Authority == AuthorityEnum.Client) ||
-            (Authority.IsServerOwned() && conn?.IsServer() == true) ||
-            (conn?.myAccountGuid != null && conn?.myAccountGuid == networkModel?.Owner);
-
-        /// <summary>
-        /// Use to check if the local account was the creator of this entity
-        /// </summary>
-        public Guid Creator => networkModel?.Creator ?? conn.myAccountGuid ?? default;
-
-        public Guid Owner { get => Model()?.Owner ?? Guid.Empty; set => Model().Owner = value; }
-
         void OnDestroy() {
             GuidManager.Remove(guid);
 #if UNITY_EDITOR
@@ -199,7 +209,7 @@ namespace OdessaEngine.NETS.Core {
         HashSet<string> loggedUnknownPaths = new HashSet<string>();
         public ObjectProperty GetPropertyAtPath(string path) {
             if (pathToProperty.TryGetValue(path, out var r)) return r;
-            foreach (var t in ObjectsToSync) {
+            foreach (var t in entitySetting.ObjectsToSync) {
                 foreach (var c in t.Components) {
                     foreach (var f in c.Fields) {
                         try {
@@ -230,7 +240,7 @@ namespace OdessaEngine.NETS.Core {
         float lastUpdateTime = 0f;
 
         public void StorePropertiesToModel() {
-            foreach (var t in ObjectsToSync) {
+            foreach (var t in entitySetting.ObjectsToSync) {
                 foreach (var c in t.Components) {
                     foreach (var f in c.Fields) {
                         if (f.Enabled == false) continue;
@@ -262,10 +272,10 @@ namespace OdessaEngine.NETS.Core {
             }
 
             if (!IsOwnedByMe) return;
-            if (Time.time < lastUpdateTime + 1f / SyncFramesPerSecond) return;
+            if (Time.time < lastUpdateTime + 1f / entitySetting.SyncFramesPerSecond) return;
             lastUpdateTime = Time.time;
 
-            if (networkModel != null || Authority == AuthorityEnum.Client)
+            if (networkModel != null || entitySetting.Authority == AuthorityEnum.Client)
                 StorePropertiesToModel();
         }
 
@@ -301,7 +311,7 @@ namespace OdessaEngine.NETS.Core {
                                     Method = objProp.Method,
                                     Lerp = new Vector3AdaptiveLerp(),
                                 };
-                                lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
+                                lerpObj.Lerp.expectedReceiveDelay = 1 / entitySetting.SyncFramesPerSecond;
                                 lerpObj.Lerp.type = objProp.Field.LerpType;
                                 lerpObj.SetValue((Vector3)obj);
                             }
@@ -315,7 +325,7 @@ namespace OdessaEngine.NETS.Core {
                                     Method = objProp.Method,
                                     Lerp = new QuaternionAdaptiveLerp(),
                                 };
-                                lerpObj.Lerp.expectedReceiveDelay = 1 / SyncFramesPerSecond;
+                                lerpObj.Lerp.expectedReceiveDelay = 1 / entitySetting.SyncFramesPerSecond;
                                 lerpObj.Lerp.type = objProp.Field.LerpType;
                                 lerpObj.SetValue((Quaternion)obj);
                             }
@@ -374,11 +384,11 @@ namespace OdessaEngine.NETS.Core {
                             c.NetsOnLostOwnership();
 
                         foreach (var lo in pathToLerpVector3.Values) {
-                            lo.Lerp.Reset(1 / SyncFramesPerSecond, (Vector3)lo.Value());
+                            lo.Lerp.Reset(1 / entitySetting.SyncFramesPerSecond, (Vector3)lo.Value());
                             lo.Lerp.ValueChanged((Vector3)lo.Value());
                         }
                         foreach (var lo in pathToLerpQuaternion.Values) {
-                            lo.Lerp.Reset(1 / SyncFramesPerSecond, (Quaternion)lo.Value());
+                            lo.Lerp.Reset(1 / entitySetting.SyncFramesPerSecond, (Quaternion)lo.Value());
                             lo.Lerp.ValueChanged((Quaternion)lo.Value());
                         }
                     }
@@ -441,16 +451,16 @@ namespace OdessaEngine.NETS.Core {
                 prefab = final;
 
                 // Fill in Objects to sync
-                if (ObjectsToSync.Any(o => o.Transform == transform) == false)
-                    ObjectsToSync.Insert(0, new ObjectToSync {
+                if (entitySetting.ObjectsToSync.Any(o => o.Transform == transform) == false)
+                    entitySetting.ObjectsToSync.Insert(0, new ObjectToSync {
                         Transform = transform,
                         Components = new List<ComponentsToSync>(),
                     });
 
-                ObjectsToSync.ForEach(o => o.IsSelf = false);
-                ObjectsToSync[0].IsSelf = true;
+                entitySetting.ObjectsToSync.ForEach(o => o.IsSelf = false);
+                entitySetting.ObjectsToSync[0].IsSelf = true;
 
-                foreach (var obj in ObjectsToSync) {
+                foreach (var obj in entitySetting.ObjectsToSync) {
                     var components = obj.Transform.GetComponents<Component>();
 
                     foreach (var comp in components) {
@@ -460,8 +470,9 @@ namespace OdessaEngine.NETS.Core {
                         if (componentToSync == null) {
                             componentToSync = new ComponentsToSync {
                                 ClassName = comp.GetType().Name,
-                                AllEnabled = false,
+                                AllEnabled = true,
                                 Fields = new List<ScriptFieldToSync>(),
+                                Path = comp.GetPath() + "." + comp.GetType().Name
                             };
                             obj.Components.Add(componentToSync);
                         }
@@ -488,6 +499,7 @@ namespace OdessaEngine.NETS.Core {
                     obj.Components = obj.Components.Where(f => components.Any(c => c.GetType().Name == f.ClassName)).ToList();
                 }
             }
+            entitySetting = entitySetting;
 #endif
         }
         public void InterpretMethod(string MethodEvent) {
@@ -524,7 +536,7 @@ namespace OdessaEngine.NETS.Core {
             if (methodToIdLookup.TryGetValue(method, out var index)) {
                 TryCreateOnServer();
                 try {
-                    conn.SendEntityEvent(this, JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
+                    connection.SendEntityEvent(this, JsonConvert.SerializeObject(new MethodEvent { methodId = index, args = args }));
                 } catch (Exception e) {
                     Debug.LogError(e);
                 }
@@ -543,31 +555,6 @@ namespace OdessaEngine.NETS.Core {
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9 });
         public void RPC<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> method, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10) => RPC(method.Method, new object[] { arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10 });
         public void RPC(Action method, object[] parameters) => RPC(method.Method, parameters);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         System.Guid guid = System.Guid.Empty;
 
@@ -654,7 +641,7 @@ namespace OdessaEngine.NETS.Core {
                 guid = System.Guid.Empty;
             } else
 #endif
-        {
+    {
                 if (guid != System.Guid.Empty) {
                     serializedGuid = guid.ToByteArray();
                 }
@@ -677,7 +664,7 @@ namespace OdessaEngine.NETS.Core {
                 guid = System.Guid.Empty;
             } else
 #endif
-        {
+    {
                 CreateGuid();
             }
         }
@@ -690,62 +677,5 @@ namespace OdessaEngine.NETS.Core {
 
             return guid;
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    }
-
-   [Serializable]
-    public class ObjectToSync {
-        public Transform Transform;
-        public List<ComponentsToSync> Components;
-        public bool IsSelf;
-    }
-
-    [Serializable]
-    public class ComponentsToSync {
-        public string ClassName;
-        public bool AllEnabled;
-        public OdessaRunWhen UpdateWhen;
-        public List<ScriptFieldToSync> Fields;
-    }
-
-    [Serializable]
-    public class ScriptFieldToSync {
-        public string FieldName;
-        public string PathName;
-        public bool Enabled;
-        public string FieldType;
-        public LerpType LerpType = LerpType.None;
-    }
-
-    public enum OdessaRunWhen {
-        Owned,
-        Always
-	}
-
-    public class ObjectProperty {
-        public object Object { get; set; }
-        public PropertyInfo Method { get; set; }
-        public ScriptFieldToSync Field { get; set; }
-        public object Value() => Method.GetValue(Object);
-        public void SetValue(object value) => Method.SetValue(Object, value);
-    }
-
-    public class Vector3LerpingObjectProperty : ObjectProperty {
-        public Vector3AdaptiveLerp Lerp { get; set; }
-    }
-    public class QuaternionLerpingObjectProperty : ObjectProperty {
-        public QuaternionAdaptiveLerp Lerp { get; set; }
     }
 }

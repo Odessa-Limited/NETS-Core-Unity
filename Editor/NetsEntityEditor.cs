@@ -22,6 +22,19 @@ public class NetsEntityEditor : Editor {
         }
     }
 
+    private EntitySetting GetEntitySettings(string path) {
+        EntitySetting _entitySetting = NETSNetworkedTypesLists.instance.EntitySettings.Where(o => o.lookup == path).FirstOrDefault();
+
+        if (_entitySetting == default) {
+            _entitySetting = new EntitySetting() { lookup = path };
+            NETSNetworkedTypesLists.instance.EntitySettings.Add(_entitySetting);
+        }
+        return _entitySetting;
+    }
+    private EntitySetting SetEntitySettings(string path, EntitySetting entitySetting) {
+        return NETSNetworkedTypesLists.instance.EntitySettings[NETSNetworkedTypesLists.instance.EntitySettings.IndexOf(NETSNetworkedTypesLists.instance.EntitySettings.Where(o=> o.lookup == path).First())] = entitySetting;
+    }
+
     public override void OnInspectorGUI() {
         //LOGO
         var controlRect = EditorGUILayout.GetControlRect();
@@ -36,6 +49,8 @@ public class NetsEntityEditor : Editor {
         EditorGUILayout.Space(controlRect.width * 0.37f);
         //
         serializedObject.Update();
+        var path = serializedObject.FindProperty(nameof(NetsEntity.prefab)).stringValue;
+        EntitySetting entitySettings = GetEntitySettings(path);
         EditorGUI.BeginDisabledGroup(true);
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Entity");
@@ -45,14 +60,14 @@ public class NetsEntityEditor : Editor {
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.Space();
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.SyncFramesPerSecond)), new GUIContent("Send Frames Per Second"));
+        EditorGUILayout.LabelField("Send Frames Per Second");
+        entitySettings.SyncFramesPerSecond = EditorGUILayout.Slider(5f, 0f, 20f);
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.BeginHorizontal();
-        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.Authority)));
+        EditorGUILayout.LabelField("Authority");
+        EditorGUILayout.EnumPopup(AuthorityEnum.Client);
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.Space();
-
-        var objectsToSync = serializedObject.FindProperty(nameof(NetsEntity.ObjectsToSync));
 
         //GUI.backgroundColor = new Color32(47, 163, 220, 255); // Odessa color
         Texture2D texture = new Texture2D(1, 1);
@@ -63,26 +78,24 @@ public class NetsEntityEditor : Editor {
         var headingStyle = new GUIStyle(); 
         EditorGUILayout.LabelField("Synced scripts and child objects", EditorStyles.boldLabel);
         EditorGUILayout.BeginVertical(rectStyle);
-        if (objectsToSync.isExpanded) {
-            EditorGUI.indentLevel += 1;
-            RenderObject(objectsToSync.GetArrayElementAtIndex(0), Selection.activeObject as GameObject);
-            EditorGUILayout.Space();
-            RenderNewObjectTransform(objectsToSync);
+        EditorGUI.indentLevel += 1;
+        if (entitySettings.ObjectsToSync.Count > 0) {
+            var returnedObject = RenderObject(entitySettings, entitySettings.ObjectsToSync[0], ((NetsEntity)target).gameObject);
+            entitySettings = SetEntitySettings(path, returnedObject);
         }
-
-        if (objectsToSync.isExpanded) {
-            EditorGUI.indentLevel += 1;
-            EditorGUILayout.EndVertical();
-            serializedObject.ApplyModifiedProperties();
-        }
+        EditorGUILayout.Space();
+        RenderNewObjectTransform(entitySettings);
+        EditorGUILayout.EndVertical();
+        serializedObject.ApplyModifiedProperties();
         EditorGUI.indentLevel -= 1;
+        //Make sure we're updating it
+        SetEntitySettings(path, entitySettings);
     }
-    void RenderObject(SerializedProperty node, GameObject obj, string path = "") {
-        var transform = node.FindPropertyRelative(nameof(ObjectToSync.Transform));
-        var previousPath = path;
-        path = transform.propertyPath;
+    EntitySetting RenderObject(EntitySetting entitySettings, ObjectToSync node, GameObject obj, string path = "") {
+        var transform = obj.transform;
+        path = transform.GetPath();
         if (folded.ContainsKey(path) == false) folded[path] = true;
-        folded[path] = BoldFoldout(folded[path], ((Transform)transform.objectReferenceValue).name, true);
+        folded[path] = BoldFoldout(folded[path], transform.name, true);
         if (folded.ContainsKey(path) == false) folded[path] = true;
         if (folded[path]) {
             EditorGUI.indentLevel += 1;
@@ -91,15 +104,16 @@ public class NetsEntityEditor : Editor {
             folded[path + "_components"] = BoldFoldout(folded[path + "_components"], "Components", true);
             if (folded[path + "_components"]) {
                 EditorGUI.indentLevel += 1;
-                RenderObjectProperties(node);
+                var toReturn = RenderObjectProperties(node);
+                entitySettings.ObjectsToSync[entitySettings.ObjectsToSync.IndexOf(node)] = toReturn;
                 EditorGUI.indentLevel -= 1;
             }
             //Children
-            var objectsToSync = serializedObject.FindProperty(nameof(NetsEntity.ObjectsToSync));
-            var syncObjectChildren = new Dictionary<GameObject, SerializedProperty>();
+            var syncObjectChildren = new Dictionary<GameObject, ObjectToSync>();
             foreach (Transform child in obj.transform) {
-                foreach (SerializedProperty synced in objectsToSync.Copy()) {
-                    if (synced.FindPropertyRelative("Transform").objectReferenceValue.GetInstanceID() == child.GetInstanceID() && !syncObjectChildren.ContainsKey(child.gameObject)) {
+                for (int i = 1; i < entitySettings.ObjectsToSync.Count; i++) {
+                    ObjectToSync synced = entitySettings.ObjectsToSync[i];
+                    if (synced.Transform.GetInstanceID() == child.GetInstanceID() && !syncObjectChildren.ContainsKey(child.gameObject)) {
                         syncObjectChildren.Add(child.gameObject, synced);
                     }
                 }
@@ -110,13 +124,14 @@ public class NetsEntityEditor : Editor {
                 if (folded[path + "_children"]) {
                     EditorGUI.indentLevel += 1;
                     foreach (var child in syncObjectChildren) {
-                        RenderObject(child.Value, child.Key, path);
+                        var returned = RenderObject(entitySettings, child.Value, child.Key, path);
                     }
                     EditorGUI.indentLevel -= 1;
                 }
             }
             EditorGUI.indentLevel -= 1;
         }
+        return entitySettings;
     }
     bool BoldFoldout(bool foldoutState, string content, bool toggleOnLabelClick) {
         GUIStyle style = EditorStyles.foldout;
@@ -126,7 +141,7 @@ public class NetsEntityEditor : Editor {
         style.fontStyle = previousStyle;
         return result;
     }
-    static bool TickableFoldout(SerializedProperty tickableState, bool foldoutState, string content, bool toggleOnLabelClick) {
+    static TickableFoldoutState TickableFoldout(bool currentState, OdessaRunWhen currentRunWhen, bool foldoutState, string content, bool toggleOnLabelClick) {
         EditorGUILayout.BeginHorizontal();
         //TODO fix up layout of the overall positioning of the tick boxes to be inline with the middle
         var style = new GUIStyle();
@@ -135,13 +150,23 @@ public class NetsEntityEditor : Editor {
         var foldoutResult = EditorGUILayout.Foldout(foldoutState, content, toggleOnLabelClick);
         EditorGUILayout.EndVertical();
         EditorGUILayout.BeginVertical(style);
-        EditorGUILayout.PropertyField(tickableState.FindPropertyRelative(nameof(ComponentsToSync.AllEnabled)), new GUIContent());
+        EditorGUILayout.BeginHorizontal();
+        var toggleResult = EditorGUILayout.Toggle(currentState);
+        EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
         //EditorGUILayout.BeginVertical(style);
-        EditorGUILayout.PropertyField(tickableState.FindPropertyRelative(nameof(ComponentsToSync.UpdateWhen)));
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Update when");
+        OdessaRunWhen updateWhenResult = (OdessaRunWhen)EditorGUILayout.EnumPopup(currentRunWhen);
+        EditorGUILayout.EndHorizontal();
         //EditorGUILayout.EndVertical();
         EditorGUILayout.EndHorizontal();
-        return foldoutResult;
+        return new TickableFoldoutState() { folded = foldoutResult, toggled = toggleResult, updateWhen = updateWhenResult };
+    }
+    public class TickableFoldoutState {
+        public bool folded = false;
+        public bool toggled = false;
+        public OdessaRunWhen updateWhen = OdessaRunWhen.Always;
     }
     
     public static object GetTargetObjectOfProperty(SerializedProperty prop) {
@@ -196,78 +221,88 @@ public class NetsEntityEditor : Editor {
     }
 
 
-    void RenderObjectProperties(SerializedProperty objectProperties) {
-        var fields = objectProperties.FindPropertyRelative(nameof(ObjectToSync.Components));
-        for (int i = 0; i < fields.arraySize; i++) {
-            var field = fields.GetArrayElementAtIndex(i);
-            var fieldName = field.FindPropertyRelative(nameof(ComponentsToSync.ClassName)).stringValue;
+    ObjectToSync RenderObjectProperties(ObjectToSync objectToSync) {
+        var fields = objectToSync.Components;
+        for (int i = 0; i < fields.Count; i++) {
+            var field = fields[i];
+            var fieldName = field.ClassName;
 
-            var componentFields = field.FindPropertyRelative(nameof(ComponentsToSync.Fields));
-            if (componentFields.arraySize > 0) {
-                RenderComponentsProperties(field, fieldName);
+            var componentFields = field.Fields;
+            if (componentFields.Count > 0) {
+                fields[i] = RenderComponentsProperties(field, fieldName);
                 continue;
             }
         }
-
+        objectToSync.Components = fields;
+        return objectToSync;
     }
-    void RenderComponentsProperties(SerializedProperty componentProperties, string name) {
-        var field = componentProperties.FindPropertyRelative(nameof(ComponentsToSync.Fields));
-        var allEnabled = componentProperties.FindPropertyRelative(nameof(ComponentsToSync.AllEnabled));
-        var path = field.propertyPath;
+    ComponentsToSync RenderComponentsProperties(ComponentsToSync componentSync, string name) {
+        var fields = componentSync.Fields;
+        var path = componentSync.Path;
 
         if (folded.ContainsKey(path) == false) folded[path] = true;
-        folded[path] = TickableFoldout(componentProperties, folded[path], name, true);
+        var result = TickableFoldout(componentSync.AllEnabled, componentSync.UpdateWhen, folded[path], name, true);
+        folded[path] = result.folded;
+        var allEnabled = componentSync.AllEnabled = result.toggled;
+        componentSync.UpdateWhen = result.updateWhen;
         if (folded[path]) {
             if (folded.ContainsKey(path + "_allEnabled") == false) folded[path + "_allEnabled"] = true;
-            var allEnabledStateHasChanged = folded[path + "_allEnabled"] != allEnabled.boolValue;
+            var allEnabledStateHasChanged = folded[path + "_allEnabled"] != allEnabled;
             EditorGUI.indentLevel += 1;
             //RenderObjectProperties(objectToSync);
             var sameCount = 0;
-            var fieldCopy = field.Copy();
             var groupsState = true;
-            for (int i = 0; i < fieldCopy.arraySize; i++) {
-                var innerField = fieldCopy.GetArrayElementAtIndex(i);
-                var enabled = innerField.FindPropertyRelative(nameof(ScriptFieldToSync.Enabled));
+            for (int i = 0; i < fields.Count; i++) {
+                var innerField = fields[i];
+                var enabled = innerField.Enabled;
                 if (i == 0)
-                    groupsState = enabled.boolValue;
-                if (groupsState == enabled.boolValue)
+                    groupsState = enabled;
+                if (groupsState == enabled)
                     sameCount ++;
             }
-            fieldCopy = field.Copy();
-            if (sameCount < fieldCopy.arraySize && allEnabledStateHasChanged == false)
-                allEnabled.boolValue = false; // something isn't true in list, so all enabled should be off and it hasn't been changed by the user
-            if (sameCount == fieldCopy.arraySize && allEnabledStateHasChanged == false)
-                allEnabled.boolValue = groupsState; // all are the same in the list, so all Enabled should be the same state and it hasn't been changed by the user
+            if (sameCount < fields.Count && allEnabledStateHasChanged == false)
+                allEnabled = false; // something isn't true in list, so all enabled should be off and it hasn't been changed by the user
+            if (sameCount == fields.Count && allEnabledStateHasChanged == false)
+                allEnabled = groupsState; // all are the same in the list, so all Enabled should be the same state and it hasn't been changed by the user
 
-            for (int i = 0; i < fieldCopy.arraySize; i++) {
-                var innerField = fieldCopy.GetArrayElementAtIndex(i);
-                var enabled = innerField.FindPropertyRelative(nameof(ScriptFieldToSync.Enabled));
-				if (allEnabledStateHasChanged) {//State changed, we need to match the state
-                    enabled.boolValue = allEnabled.boolValue;
+            componentSync.AllEnabled = allEnabled;
+            for (int i = 0; i < fields.Count; i++) {
+                var innerField = fields[i];
+                var enabled = innerField.Enabled;
+                if (allEnabledStateHasChanged) {//State changed, we need to match the state
+                    enabled = allEnabled;
 				}
-                var fieldName = innerField.FindPropertyRelative(nameof(ScriptFieldToSync.FieldName));
-                EditorGUILayout.PropertyField(enabled, new GUIContent(fieldName.stringValue));
-                if (enabled.boolValue) {
+                var fieldName = innerField.FieldName;
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(fieldName);
+                innerField.Enabled = EditorGUILayout.Toggle(enabled);
+                EditorGUILayout.EndHorizontal();
+                if (enabled) {
                     EditorGUI.indentLevel += 1;
-                    var fieldType = innerField.FindPropertyRelative(nameof(ScriptFieldToSync.FieldType));
-                    if (new[] { "Quaternion", "Vector3", /*"Vector2", "Single"*/ }.Contains(fieldType.stringValue)) {
-                        var lerpType = innerField.FindPropertyRelative(nameof(ScriptFieldToSync.LerpType));
-                        EditorGUILayout.PropertyField(lerpType, new GUIContent("Lerp Type"));
+                    var fieldType = innerField.FieldType;
+                    if (new[] { "Quaternion", "Vector3", /*"Vector2", "Single"*/ }.Contains(fieldType)) {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.LabelField(fieldName);
+                        innerField.LerpType = (LerpType)EditorGUILayout.EnumPopup(innerField.LerpType);
+                        EditorGUILayout.EndHorizontal();
                     }
                     EditorGUI.indentLevel -= 1;
                 }
+                componentSync.Fields[i] = innerField;
             }
-            folded[path + "_allEnabled"] = allEnabled.boolValue;//if this wasn't changed by us above, then store it's state to find when it changes
+            folded[path + "_allEnabled"] = allEnabled;//if this wasn't changed by us above, then store it's state to find when it changes
             EditorGUI.indentLevel -= 1;
         }
-
+        return componentSync;
     }
-    void RenderNewObjectTransform(SerializedProperty objectsToSync) {
+    void RenderNewObjectTransform(EntitySetting settings) {
         var addedTransform = serializedObject.FindProperty(nameof(NetsEntity.addedTransform));
         if (addedTransform.objectReferenceValue != null) {
-            objectsToSync.InsertArrayElementAtIndex(objectsToSync.arraySize);
-            var prop = objectsToSync.GetArrayElementAtIndex(objectsToSync.arraySize - 1);
-            prop.FindPropertyRelative(nameof(ObjectToSync.Transform)).objectReferenceValue = addedTransform.objectReferenceValue;
+            var newSyncObj = new ObjectToSync() {
+                Transform = addedTransform.objectReferenceValue as Transform,
+                Components = new List<ComponentsToSync>(),
+            };
+            settings.ObjectsToSync.Add(newSyncObj);
         }
         addedTransform.objectReferenceValue = null;
         EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(NetsEntity.addedTransform)), new GUIContent("Add Another Child:"));
