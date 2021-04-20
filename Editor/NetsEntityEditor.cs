@@ -65,7 +65,7 @@ public class NetsEntityEditor : Editor {
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Authority");
-        EditorGUILayout.EnumPopup(AuthorityEnum.Client);
+        entitySettings.Authority = (AuthorityEnum)EditorGUILayout.EnumPopup(entitySettings.Authority);
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.Space();
 
@@ -94,6 +94,7 @@ public class NetsEntityEditor : Editor {
     EntitySetting RenderObject(EntitySetting entitySettings, ObjectToSync node, GameObject obj, string path = "") {
         var transform = obj.transform;
         path = transform.GetPath();
+        Debug.Log($"Path {path}");
         if (folded.ContainsKey(path) == false) folded[path] = true;
         folded[path] = BoldFoldout(folded[path], transform.name, true);
         if (folded.ContainsKey(path) == false) folded[path] = true;
@@ -124,7 +125,7 @@ public class NetsEntityEditor : Editor {
                 if (folded[path + "_children"]) {
                     EditorGUI.indentLevel += 1;
                     foreach (var child in syncObjectChildren) {
-                        var returned = RenderObject(entitySettings, child.Value, child.Key, path);
+                        entitySettings = RenderObject(entitySettings, child.Value, child.Key, path);
                     }
                     EditorGUI.indentLevel -= 1;
                 }
@@ -144,22 +145,19 @@ public class NetsEntityEditor : Editor {
     static TickableFoldoutState TickableFoldout(bool currentState, OdessaRunWhen currentRunWhen, bool foldoutState, string content, bool toggleOnLabelClick) {
         EditorGUILayout.BeginHorizontal();
         //TODO fix up layout of the overall positioning of the tick boxes to be inline with the middle
-        var style = new GUIStyle();
-        style.fixedWidth = EditorGUIUtility.currentViewWidth / 10;
-        EditorGUILayout.BeginVertical(style);
+        EditorGUILayout.BeginVertical();
         var foldoutResult = EditorGUILayout.Foldout(foldoutState, content, toggleOnLabelClick);
         EditorGUILayout.EndVertical();
+        var style = new GUIStyle();
+        style.padding = new RectOffset((int)(EditorGUIUtility.currentViewWidth / 8), 0, 0, 0);
         EditorGUILayout.BeginVertical(style);
-        EditorGUILayout.BeginHorizontal();
         var toggleResult = EditorGUILayout.Toggle(currentState);
-        EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
-        //EditorGUILayout.BeginVertical(style);
-        EditorGUILayout.BeginHorizontal();
+        var style2 = new GUIStyle();
+        EditorGUILayout.BeginVertical();
         EditorGUILayout.LabelField("Update when");
-        OdessaRunWhen updateWhenResult = (OdessaRunWhen)EditorGUILayout.EnumPopup(currentRunWhen);
-        EditorGUILayout.EndHorizontal();
-        //EditorGUILayout.EndVertical();
+        OdessaRunWhen updateWhenResult = (OdessaRunWhen)EditorGUILayout.EnumPopup(currentRunWhen, GUILayout.ExpandWidth(true), GUILayout.MinWidth(100));
+        EditorGUILayout.EndVertical();
         EditorGUILayout.EndHorizontal();
         return new TickableFoldoutState() { folded = foldoutResult, toggled = toggleResult, updateWhen = updateWhenResult };
     }
@@ -264,6 +262,7 @@ public class NetsEntityEditor : Editor {
                 allEnabled = false; // something isn't true in list, so all enabled should be off and it hasn't been changed by the user
             if (sameCount == fields.Count && allEnabledStateHasChanged == false)
                 allEnabled = groupsState; // all are the same in the list, so all Enabled should be the same state and it hasn't been changed by the user
+            folded[path + "_allEnabled"] = allEnabled;
 
             componentSync.AllEnabled = allEnabled;
             for (int i = 0; i < fields.Count; i++) {
@@ -290,7 +289,6 @@ public class NetsEntityEditor : Editor {
                 }
                 componentSync.Fields[i] = innerField;
             }
-            folded[path + "_allEnabled"] = allEnabled;//if this wasn't changed by us above, then store it's state to find when it changes
             EditorGUI.indentLevel -= 1;
         }
         return componentSync;

@@ -21,7 +21,7 @@ public class RoomServiceUtils : MonoBehaviour {
     static string roomserviceUrl => settings.UseLocalServices ? "http://127.0.0.1:8001" : NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
     static string authUrl => settings.UseLocalServices ? "http://127.0.0.1:8002" : NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
 #else
-    static string url => NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
+    static string roomserviceUrl => NetsNetworkingConsts.NETS_ROOM_SERVICE_URL;
     static string authUrl => NetsNetworkingConsts.NETS_AUTH_SERVICE_URL;
 #endif
 

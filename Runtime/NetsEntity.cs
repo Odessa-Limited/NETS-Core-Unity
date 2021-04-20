@@ -75,6 +75,9 @@ namespace OdessaEngine.NETS.Core {
                 _connection = value;
             }
         }
+        public void SetAuthority(AuthorityEnum newState) {
+            entitySetting.Authority = newState;
+        }
         public bool IsReady => localModel != null;
         #endregion
         #region Editor related
@@ -461,6 +464,7 @@ namespace OdessaEngine.NETS.Core {
                 entitySetting.ObjectsToSync[0].IsSelf = true;
 
                 foreach (var obj in entitySetting.ObjectsToSync) {
+                    if (!obj.Transform) continue;
                     var components = obj.Transform.GetComponents<Component>();
 
                     foreach (var comp in components) {
@@ -472,7 +476,7 @@ namespace OdessaEngine.NETS.Core {
                                 ClassName = comp.GetType().Name,
                                 AllEnabled = true,
                                 Fields = new List<ScriptFieldToSync>(),
-                                Path = comp.GetPath() + "." + comp.GetType().Name
+                                Path = comp.GetPath()
                             };
                             obj.Components.Add(componentToSync);
                         }

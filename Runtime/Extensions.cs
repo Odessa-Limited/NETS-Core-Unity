@@ -21,7 +21,7 @@ namespace OdessaEngine.NETS.Core {
 			return current.parent.GetPath() + "/" + current.name;
 		}
 		public static string GetPath(this Component component) {
-			return component.transform.GetPath() + "/" + component.GetType().ToString();
+			return component.transform.GetPath() + "/" + component.GetType().Name;
 		}
 		public static bool IsServerOwned(this AuthorityEnum e) => e == AuthorityEnum.Server || e == AuthorityEnum.ServerSingleton;
 
