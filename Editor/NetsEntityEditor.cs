@@ -10,7 +10,7 @@ using UnityEngine.UIElements;
 
 [CustomEditor(typeof(NetsEntity))]
 public class NetsEntityEditor : Editor {
-
+    
     Dictionary<string, bool> folded = new Dictionary<string, bool>();
 
     Texture _OdessaNetsLogo = null;
@@ -91,10 +91,9 @@ public class NetsEntityEditor : Editor {
         //Make sure we're updating it
         SetEntitySettings(path, entitySettings);
     }
-    EntitySetting RenderObject(EntitySetting entitySettings, ObjectToSync node, GameObject obj, string path = "") {
+    EntitySetting RenderObject(EntitySetting entitySettings, ObjectToSync node, GameObject obj,int index = 0, string path = "") {
         var transform = obj.transform;
         path = transform.GetPath();
-        Debug.Log($"Path {path}");
         if (folded.ContainsKey(path) == false) folded[path] = true;
         folded[path] = BoldFoldout(folded[path], transform.name, true);
         if (folded.ContainsKey(path) == false) folded[path] = true;
@@ -106,16 +105,22 @@ public class NetsEntityEditor : Editor {
             if (folded[path + "_components"]) {
                 EditorGUI.indentLevel += 1;
                 var toReturn = RenderObjectProperties(node);
-                entitySettings.ObjectsToSync[entitySettings.ObjectsToSync.IndexOf(node)] = toReturn;
+                entitySettings.ObjectsToSync[index] = toReturn;
                 EditorGUI.indentLevel -= 1;
             }
             //Children
-            var syncObjectChildren = new Dictionary<GameObject, ObjectToSync>();
-            foreach (Transform child in obj.transform) {
-                for (int i = 1; i < entitySettings.ObjectsToSync.Count; i++) {
+            var syncObjectChildren = new List<SyncObjectChild>();
+            for (int j =0; j < obj.transform.childCount;j++){
+                Transform child = obj.transform.GetChild(j);
+                for (int i = 0; i < entitySettings.ObjectsToSync.Count; i++) {
                     ObjectToSync synced = entitySettings.ObjectsToSync[i];
-                    if (synced.Transform.GetInstanceID() == child.GetInstanceID() && !syncObjectChildren.ContainsKey(child.gameObject)) {
-                        syncObjectChildren.Add(child.gameObject, synced);
+                    if (synced.Transform.name == child.name && syncObjectChildren.Where(c => c.gameObject == child.gameObject).Any() == false) {
+                        syncObjectChildren.Add(
+                            new SyncObjectChild() {
+                                gameObject = child.gameObject,
+                                objectToSync = synced,
+                                index = i
+                            }); 
                     }
                 }
             }
@@ -125,7 +130,7 @@ public class NetsEntityEditor : Editor {
                 if (folded[path + "_children"]) {
                     EditorGUI.indentLevel += 1;
                     foreach (var child in syncObjectChildren) {
-                        entitySettings = RenderObject(entitySettings, child.Value, child.Key, path);
+                        entitySettings = RenderObject(entitySettings, child.objectToSync, child.gameObject, child.index, path);
                     }
                     EditorGUI.indentLevel -= 1;
                 }
@@ -134,6 +139,11 @@ public class NetsEntityEditor : Editor {
         }
         return entitySettings;
     }
+    class SyncObjectChild {
+        public GameObject gameObject;
+        public ObjectToSync objectToSync;
+        public int index;
+	}
     bool BoldFoldout(bool foldoutState, string content, bool toggleOnLabelClick) {
         GUIStyle style = EditorStyles.foldout;
         FontStyle previousStyle = style.fontStyle;
@@ -154,11 +164,9 @@ public class NetsEntityEditor : Editor {
         var toggleResult = EditorGUILayout.Toggle(currentState);
         EditorGUILayout.EndVertical();
         var style2 = new GUIStyle();
-        EditorGUILayout.BeginVertical();
         EditorGUILayout.LabelField("Update when");
         OdessaRunWhen updateWhenResult = (OdessaRunWhen)EditorGUILayout.EnumPopup(currentRunWhen, GUILayout.ExpandWidth(true), GUILayout.MinWidth(100));
         EditorGUILayout.EndVertical();
-        EditorGUILayout.EndHorizontal();
         return new TickableFoldoutState() { folded = foldoutResult, toggled = toggleResult, updateWhen = updateWhenResult };
     }
     public class TickableFoldoutState {
@@ -241,11 +249,11 @@ public class NetsEntityEditor : Editor {
         if (folded.ContainsKey(path) == false) folded[path] = true;
         var result = TickableFoldout(componentSync.AllEnabled, componentSync.UpdateWhen, folded[path], name, true);
         folded[path] = result.folded;
-        var allEnabled = componentSync.AllEnabled = result.toggled;
+        var allEnabled = result.toggled;
+        var allEnabledStateHasChanged = componentSync.AllEnabled != allEnabled;
         componentSync.UpdateWhen = result.updateWhen;
         if (folded[path]) {
             if (folded.ContainsKey(path + "_allEnabled") == false) folded[path + "_allEnabled"] = true;
-            var allEnabledStateHasChanged = folded[path + "_allEnabled"] != allEnabled;
             EditorGUI.indentLevel += 1;
             //RenderObjectProperties(objectToSync);
             var sameCount = 0;
@@ -260,11 +268,12 @@ public class NetsEntityEditor : Editor {
             }
             if (sameCount < fields.Count && allEnabledStateHasChanged == false)
                 allEnabled = false; // something isn't true in list, so all enabled should be off and it hasn't been changed by the user
-            if (sameCount == fields.Count && allEnabledStateHasChanged == false)
+            if (sameCount == fields.Count && allEnabledStateHasChanged == false) {
                 allEnabled = groupsState; // all are the same in the list, so all Enabled should be the same state and it hasn't been changed by the user
+                allEnabledStateHasChanged = true;
+            }
             folded[path + "_allEnabled"] = allEnabled;
-
-            componentSync.AllEnabled = allEnabled;
+            var stateEnabledThisFrame = 0;
             for (int i = 0; i < fields.Count; i++) {
                 var innerField = fields[i];
                 var enabled = innerField.Enabled;
@@ -275,27 +284,32 @@ public class NetsEntityEditor : Editor {
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField(fieldName);
                 innerField.Enabled = EditorGUILayout.Toggle(enabled);
-                EditorGUILayout.EndHorizontal();
                 if (enabled) {
+                    stateEnabledThisFrame++;
                     EditorGUI.indentLevel += 1;
                     var fieldType = innerField.FieldType;
                     if (new[] { "Quaternion", "Vector3", /*"Vector2", "Single"*/ }.Contains(fieldType)) {
+
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField(fieldName);
                         innerField.LerpType = (LerpType)EditorGUILayout.EnumPopup(innerField.LerpType);
                         EditorGUILayout.EndHorizontal();
                     }
                     EditorGUI.indentLevel -= 1;
                 }
-                componentSync.Fields[i] = innerField;
+                EditorGUILayout.EndHorizontal();
+                var newFeilds = new List<ScriptFieldToSync>();
+                newFeilds.AddRange(componentSync.Fields);
+                newFeilds[i] = innerField;
+                componentSync.Fields = newFeilds;
             }
+            componentSync.AllEnabled = allEnabled;
             EditorGUI.indentLevel -= 1;
         }
         return componentSync;
     }
     void RenderNewObjectTransform(EntitySetting settings) {
         var addedTransform = serializedObject.FindProperty(nameof(NetsEntity.addedTransform));
-        if (addedTransform.objectReferenceValue != null) {
+        if (addedTransform.objectReferenceValue != null && settings.ObjectsToSync.Where( o => o.Transform == addedTransform.objectReferenceValue as Transform).Any() == false) {
             var newSyncObj = new ObjectToSync() {
                 Transform = addedTransform.objectReferenceValue as Transform,
                 Components = new List<ComponentsToSync>(),
